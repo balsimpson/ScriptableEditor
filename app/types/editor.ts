@@ -22,6 +22,7 @@ export interface NumberFormatOptions {
   textCase: 'none' | 'uppercase' | 'lowercase'
   dateFormat: string
   fallback: string
+  compact?: boolean
 }
 
 export interface WidgetProperties {

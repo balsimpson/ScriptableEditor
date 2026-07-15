@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance, CSSProperties } from 'vue'
 import type { DateProperties, ImageProperties, SpacerProperties, StackProperties, TextProperties, WidgetElement } from '~/types/editor'
-import { formatDatePattern, formatPreviewValue } from '~/utils/editor'
+import { colorForPreview, formatDatePattern, formatPreviewValue } from '~/utils/editor'
 
 defineOptions({ name: 'EditorPreviewNode' })
 
@@ -32,7 +32,7 @@ const stackStyle = computed<CSSProperties>(() => {
     return (child.properties as SpacerProperties).mode === 'flexible'
   })
   const alignMap = { leading: 'flex-start', center: 'center', trailing: 'flex-end' } as const
-  const alphaColor = value.backgroundColor || 'transparent'
+  const alphaColor = colorForPreview(value.backgroundColor || 'transparent')
   return {
     display: 'flex',
     flexDirection: vertical ? 'column' : 'row',
@@ -42,7 +42,7 @@ const stackStyle = computed<CSSProperties>(() => {
     padding: `${value.padding}px`,
     backgroundColor: alphaColor,
     borderRadius: `${value.cornerRadius}px`,
-    border: value.borderWidth ? `${value.borderWidth}px solid ${value.borderColor}` : undefined,
+    border: value.borderWidth ? `${value.borderWidth}px solid ${colorForPreview(value.borderColor)}` : undefined,
     position: 'relative',
     width: !vertical && hasFlexibleSpacer ? '100%' : undefined,
     height: vertical && hasFlexibleSpacer ? '100%' : undefined,
@@ -78,7 +78,7 @@ const textStyle = computed<CSSProperties>(() => {
   }
   const weightMap = { ultralight: 100, light: 300, regular: 400, medium: 500, semibold: 600, bold: 700, heavy: 800, black: 900 }
   return {
-    color: value.color,
+    color: colorForPreview(value.color),
     fontFamily: fontMap[value.font],
     fontSize: `${value.fontSize}px`,
     fontWeight: weightMap[value.weight],
@@ -109,7 +109,7 @@ const imageStyle = computed<CSSProperties>(() => {
     borderRadius: `${value.cornerRadius}px`,
     opacity: value.opacity,
     objectFit: value.contentMode === 'fill' ? 'cover' : 'contain',
-    color: value.tintColor,
+    color: colorForPreview(value.tintColor),
     flex: '0 0 auto'
   }
 })
@@ -161,7 +161,7 @@ const dateStyle = computed<CSSProperties>(() => {
   const value = props.element.properties as DateProperties
   const weightMap = { ultralight: 100, light: 300, regular: 400, medium: 500, semibold: 600, bold: 700, heavy: 800, black: 900 }
   return {
-    color: value.color,
+    color: colorForPreview(value.color),
     fontSize: `${value.fontSize}px`,
     fontWeight: weightMap[value.weight],
     fontFamily: value.font === 'monospaced' ? 'var(--font-mono)' : value.font === 'serif' ? 'Georgia, serif' : 'var(--font-sans)',

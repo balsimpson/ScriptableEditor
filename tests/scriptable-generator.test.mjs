@@ -12,7 +12,8 @@ async function loadStudioModules() {
       contents: [
         'export { generateScriptableCode, getScriptableExportIssues } from "./app/utils/scriptable.ts"',
         'export { generateUniversalDataProbeCode } from "./app/utils/data.ts"',
-        'export { createDocument, createElement } from "./app/utils/editor.ts"',
+        'export { createDocument, createElement, formatPreviewValue } from "./app/utils/editor.ts"',
+        'export { buildWidgetTemplate, generateWidgetTemplateOptions } from "./app/utils/templates.ts"',
         'export { createWidgetStarterDocument } from "./app/utils/starters.ts"'
       ].join('\n'),
       resolveDir: workspace,
@@ -92,6 +93,7 @@ function installScriptableMocks({ family = 'medium', runsInWidget = true, runsWi
   globalThis.Color = class {
     constructor(hex, alpha = 1) { this.hex = hex; this.alpha = alpha }
     static white() { return new this('#ffffff') }
+    static dynamic(light, dark) { return { light, dark } }
   }
   globalThis.Font = new Proxy(class {}, { get: () => () => ({}) })
   globalThis.Size = class { constructor(width, height) { this.width = width; this.height = height } }
@@ -142,6 +144,68 @@ test('all starter scripts are valid JavaScript', async () => {
     assert.match(code, /function renderErrorWidget/)
   }
   await transform(studio.generateUniversalDataProbeCode(), { loader: 'js', format: 'esm', target: 'esnext' })
+})
+
+test('generated templates use adaptive colors, stable compact values, and no synthetic dates', () => {
+  const document = studio.createDocument()
+  document.data.sampleData = { currentPriceUsd: 67432.55, change: -2.4, symbol: 'BTC' }
+  const options = studio.generateWidgetTemplateOptions(document, 'small', 0, 4)
+
+  assert.equal(options.length, 4)
+  assert.ok(options.every(option => option.palette.background.startsWith('dynamic(')))
+  assert.ok(options.every(option => option.typography !== 'serif' || option.recipe === 'editorial'))
+
+  for (const option of options) {
+    const built = studio.buildWidgetTemplate(option, document)
+    const queue = [built.root]
+    let sawPrimary = false
+    let sawDelta = false
+    while (queue.length) {
+      const element = queue.shift()
+      if (element.type === 'date') assert.fail('templates without date data must not add current date nodes')
+      if (element.type === 'text' && element.properties.variable === 'currentPriceUsd') {
+        sawPrimary = true
+        assert.equal(element.properties.format.compact, true)
+        assert.ok(element.properties.fontSize >= 16)
+      }
+      if (element.type === 'text' && element.properties.variable === 'change') {
+        sawDelta = true
+        assert.match(element.properties.format.prefix, /^▼ /)
+      }
+      queue.push(...element.children)
+    }
+    assert.equal(sawPrimary, true)
+    if (built.usedPaths.includes('change')) assert.equal(sawDelta, true)
+  }
+
+  assert.equal(studio.formatPreviewValue(67432.55, {
+    round: false,
+    decimals: 2,
+    currency: '$',
+    prefix: '',
+    suffix: '',
+    percentage: false,
+    textCase: 'none',
+    dateFormat: '',
+    fallback: '—',
+    compact: true
+  }), '$67.4K')
+})
+
+test('status templates add a segmented progress affordance', () => {
+  const document = studio.createDocument()
+  document.data.sampleData = { battery: 72, uptime: 99.9 }
+  const option = { ...studio.generateWidgetTemplateOptions(document, 'medium', 0, 1)[0], recipe: 'focus' }
+  const built = studio.buildWidgetTemplate(option, document)
+  const queue = [built.root]
+  let progress
+  while (queue.length) {
+    const element = queue.shift()
+    if (element.name === 'Battery progress') progress = element
+    queue.push(...element.children)
+  }
+  assert.equal(progress?.type, 'horizontalStack')
+  assert.equal(progress?.children.length, 8)
 })
 
 test('Bitcoin export uses a visible configured SF Symbol', () => {

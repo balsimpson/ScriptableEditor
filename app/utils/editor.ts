@@ -384,10 +384,17 @@ export function formatPreviewValue(value: unknown, format: NumberFormatOptions):
 
   if (typeof value === 'number') {
     let numeric = format.percentage ? value * 100 : value
-    if (format.round) numeric = Math.round(numeric)
-    output = format.round
-      ? String(numeric)
-      : numeric.toFixed(Math.max(0, Math.min(8, format.decimals)))
+    if (format.compact && Math.abs(numeric) >= 1000) {
+      output = new Intl.NumberFormat('en', {
+        notation: 'compact',
+        maximumFractionDigits: 1
+      }).format(numeric)
+    } else {
+      if (format.round) numeric = Math.round(numeric)
+      output = format.round
+        ? String(numeric)
+        : numeric.toFixed(Math.max(0, Math.min(8, format.decimals)))
+    }
     if (format.percentage) output += '%'
   } else if (format.dateFormat && (typeof value === 'string' || typeof value === 'number')) {
     const date = new Date(value)
@@ -400,6 +407,15 @@ export function formatPreviewValue(value: unknown, format: NumberFormatOptions):
   if (format.textCase === 'uppercase') return output.toUpperCase()
   if (format.textCase === 'lowercase') return output.toLowerCase()
   return output
+}
+
+export function dynamicColor(light: string, dark: string) {
+  return `dynamic(${light},${dark})`
+}
+
+export function colorForPreview(value: string) {
+  const match = /^dynamic\((#[0-9a-fA-F]{6,8}),(#[0-9a-fA-F]{6,8})\)$/.exec(value)
+  return match ? `light-dark(${match[1]}, ${match[2]})` : value
 }
 
 export function formatDatePattern(date: Date, pattern: string) {

@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { colorForPreview } from '~/utils/editor'
 const model = defineModel<string>({ required: true })
 
 const pickerValue = computed({
-  get: () => /^#[0-9a-fA-F]{6}/.test(model.value) ? model.value.slice(0, 7) : '#000000',
+  get: () => {
+    const preview = colorForPreview(model.value)
+    const match = /#[0-9a-fA-F]{6}/.exec(preview)
+    return match?.[0] || '#000000'
+  },
   set: value => { model.value = value }
 })
 </script>

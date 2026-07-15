@@ -28,11 +28,28 @@ function boundExpression(_document: EditorDocument, path: string, repeatIndex?: 
 }
 
 function colorLine(target: string, property: string, value: string, indent = '', opacity = 1) {
+  const dynamic = /^dynamic\((#[0-9a-fA-F]{6,8}),(#[0-9a-fA-F]{6,8})\)$/.exec(value || '')
+  if (dynamic) {
+    const color = (hexValue: string) => {
+      const hex = hexValue.replace('#', '')
+      const rgb = `#${hex.slice(0, 6)}`
+      const sourceAlpha = hex.length >= 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
+      return `new Color(${jsString(rgb)}, ${Number((sourceAlpha * Math.max(0, Math.min(1, opacity))).toFixed(3))})`
+    }
+    return `${indent}${target}.${property} = Color.dynamic(${color(dynamic[1]!)}, ${color(dynamic[2]!)})`
+  }
   const hex = (value || '#000000').replace('#', '')
   const rgb = `#${hex.slice(0, 6).padEnd(6, '0')}`
   const sourceAlpha = hex.length >= 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
   const alpha = sourceAlpha * Math.max(0, Math.min(1, opacity))
   return `${indent}${target}.${property} = new Color(${jsString(rgb)}, ${Number(alpha.toFixed(3))})`
+}
+
+function colorStringExpression(value: string) {
+  const dynamic = /^dynamic\((#[0-9a-fA-F]{6,8}),(#[0-9a-fA-F]{6,8})\)$/.exec(value || '')
+  return dynamic
+    ? `(Device.isUsingDarkAppearance() ? ${jsString(dynamic[2])} : ${jsString(dynamic[1])})`
+    : jsString(value)
 }
 
 function fontExpression(font: string, weight: string, size: number) {
@@ -58,7 +75,8 @@ function formatConfig(format: NumberFormatOptions) {
     percentage: format.percentage,
     textCase: format.textCase,
     dateFormat: format.dateFormat,
-    fallback: format.fallback
+    fallback: format.fallback,
+    compact: format.compact
   })
 }
 
@@ -409,7 +427,7 @@ function widgetLayoutBlock(document: EditorDocument, size: PreviewSize) {
   const backgroundImageLines = properties.backgroundImageMode === 'none' || backgroundOpacity === 0
     ? ''
     : hasPartialBackgroundImage
-      ? `    const backgroundImage = await loadRemoteImage(String(${backgroundImageExpression} || ""), ${jsString(`${size.charAt(0).toUpperCase() + size.slice(1)} > Widget background`)})\n    const visibleBackgroundImage = await imageWithOpacity(backgroundImage, ${Number(backgroundOpacity.toFixed(3))}, ${jsString(properties.backgroundColor)})\n    if (visibleBackgroundImage) widget.backgroundImage = visibleBackgroundImage\n    else ${colorLine('widget', 'backgroundColor', properties.backgroundColor, '', backgroundOpacity)}\n`
+      ? `    const backgroundImage = await loadRemoteImage(String(${backgroundImageExpression} || ""), ${jsString(`${size.charAt(0).toUpperCase() + size.slice(1)} > Widget background`)})\n    const visibleBackgroundImage = await imageWithOpacity(backgroundImage, ${Number(backgroundOpacity.toFixed(3))}, ${colorStringExpression(properties.backgroundColor)})\n    if (visibleBackgroundImage) widget.backgroundImage = visibleBackgroundImage\n    else ${colorLine('widget', 'backgroundColor', properties.backgroundColor, '', backgroundOpacity)}\n`
       : `    const backgroundImage = await loadRemoteImage(String(${backgroundImageExpression} || ""), ${jsString(`${size.charAt(0).toUpperCase() + size.slice(1)} > Widget background`)})\n    if (backgroundImage) widget.backgroundImage = backgroundImage\n`
 
   return `  if (family === ${jsString(size)}) {
@@ -987,7 +1005,14 @@ function formatValue(value, options) {
   let output = value
   if (typeof output === "number") {
     if (options.percentage) output *= 100
-    output = options.round ? Math.round(output) : output.toFixed(options.decimals)
+    if (options.compact && Math.abs(output) >= 1000) {
+      const absolute = Math.abs(output)
+      const divisor = absolute >= 1000000000 ? 1000000000 : absolute >= 1000000 ? 1000000 : 1000
+      const unit = divisor === 1000000000 ? "B" : divisor === 1000000 ? "M" : "K"
+      output = (output / divisor).toFixed(1).replace(/\\.0$/, "") + unit
+    } else {
+      output = options.round ? Math.round(output) : output.toFixed(options.decimals)
+    }
     if (options.percentage) output += "%"
   } else if (options.dateFormat) {
     const date = new Date(output)

@@ -10,7 +10,7 @@ import type {
   WidgetProperties
 } from '~/types/editor'
 import { applyDataTransforms } from '~/utils/data'
-import { createElement, DEFAULT_FORMAT, flattenJson, formatPreviewValue, getValueAtPath } from '~/utils/editor'
+import { createElement, DEFAULT_FORMAT, dynamicColor, flattenJson, formatPreviewValue, getValueAtPath } from '~/utils/editor'
 
 export interface TemplateVariable {
   path: string
@@ -92,6 +92,9 @@ interface TemplateContext {
   image?: TemplateVariable
 }
 
+type GeneratedElementRole = 'label' | 'accent-symbol'
+const generatedElementRoles = new WeakMap<WidgetElement, GeneratedElementRole>()
+
 export const TEMPLATE_DOMAIN_LABELS: Record<TemplateDomain, string> = {
   weather: 'Weather data',
   expense: 'Expense data',
@@ -135,7 +138,7 @@ export const TEMPLATE_DENSITY_LABELS: Record<TemplateDensity, string> = {
 }
 
 const DENSITY_SEQUENCE: TemplateDensity[] = ['balanced', 'minimal', 'dense', 'balanced']
-const TYPOGRAPHY_OPTIONS: TemplateTypography[] = ['system', 'rounded', 'serif', 'monospaced']
+const TYPOGRAPHY_OPTIONS: TemplateTypography[] = ['system', 'rounded', 'monospaced']
 const EMPHASIS_OPTIONS: TemplateEmphasis[] = ['quiet', 'balanced', 'vivid']
 const DENSITY_RECIPE_POOLS: Record<PreviewSize, Record<TemplateDensity, TemplateRecipe[]>> = {
   small: {
@@ -343,7 +346,7 @@ const COUNTDOWN_RECIPE_NAMES: Record<TemplateRecipe, string> = {
   minimal: 'Essential countdown'
 }
 
-const PALETTES: Record<TemplateDomain, TemplatePalette[]> = {
+const RAW_PALETTES: Record<TemplateDomain, TemplatePalette[]> = {
   weather: [
     { id: 'daybreak', background: '#dceeff', foreground: '#17364d', muted: '#58788e', accent: '#e49532', accentForeground: '#172534' },
     { id: 'storm', background: '#193442', foreground: '#f5fbff', muted: '#a9c7d2', accent: '#7ed4ee', accentForeground: '#102b38' },
@@ -382,14 +385,43 @@ const PALETTES: Record<TemplateDomain, TemplatePalette[]> = {
   ]
 }
 
+const DARK_PALETTES: Record<TemplateDomain, Omit<TemplatePalette, 'id'>> = {
+  weather: { background: '#132a36', foreground: '#f5fbff', muted: '#b3cbd5', accent: '#7ed4ee', accentForeground: '#102b38' },
+  expense: { background: '#17313a', foreground: '#f5fbf8', muted: '#b2cdc6', accent: '#f2b56b', accentForeground: '#30271c' },
+  market: { background: '#141414', foreground: '#fff9ef', muted: '#bbb4aa', accent: '#f7931a', accentForeground: '#21170b' },
+  schedule: { background: '#252c3a', foreground: '#f8faff', muted: '#bec6d5', accent: '#9ab8ff', accentForeground: '#1c263b' },
+  status: { background: '#172033', foreground: '#f7f9ff', muted: '#bac3d4', accent: '#6fd2c2', accentForeground: '#132d2a' },
+  general: { background: '#172033', foreground: '#f8fafc', muted: '#bac4d3', accent: '#8de1d1', accentForeground: '#173631' }
+}
+
+const PALETTES = Object.fromEntries(
+  (Object.keys(RAW_PALETTES) as TemplateDomain[]).map((domain) => [
+    domain,
+    RAW_PALETTES[domain].map((palette) => {
+      const dark = DARK_PALETTES[domain]
+      return {
+        id: palette.id,
+        background: dynamicColor(palette.background, dark.background),
+        foreground: dynamicColor(palette.foreground, dark.foreground),
+        muted: dynamicColor(palette.muted, dark.muted),
+        accent: dynamicColor(palette.accent, dark.accent),
+        accentForeground: dynamicColor(palette.accentForeground, dark.accentForeground)
+      }
+    })
+  ])
+) as Record<TemplateDomain, TemplatePalette[]>
+
 const COUNTDOWN_IMAGE_PALETTE: TemplatePalette = {
   id: 'image-overlay',
-  background: '#17131c',
-  foreground: '#ffffff',
-  muted: '#f4d9e8',
-  accent: '#ffb2d5',
-  accentForeground: '#2b1420'
+  background: dynamicColor('#17131c', '#17131c'),
+  foreground: dynamicColor('#ffffff', '#ffffff'),
+  muted: dynamicColor('#f4d9e8', '#f4d9e8'),
+  accent: dynamicColor('#ffb2d5', '#ffb2d5'),
+  accentForeground: dynamicColor('#2b1420', '#2b1420')
 }
+
+const POSITIVE_COLOR = dynamicColor('#16774a', '#63d5a5')
+const NEGATIVE_COLOR = dynamicColor('#b53b3b', '#ff8b8b')
 
 const DOMAIN_PATTERNS: Record<Exclude<TemplateDomain, 'general'>, RegExp[]> = {
   weather: [/weather/, /forecast/, /temperature/, /\btemp\b/, /condition/, /humidity/, /precip/, /rain/, /wind/, /sunrise/, /sunset/, /feels.?like/],
@@ -731,6 +763,7 @@ function staticText(content: string, overrides: Partial<TextProperties> = {}) {
     color: '#ffffff',
     ...overrides
   })
+  generatedElementRoles.set(element, 'label')
   return element
 }
 
@@ -756,11 +789,18 @@ function inferredFormat(variable: TemplateVariable) {
       : numeric && !currency && /\bbtc\b/.test(path) && !/price/.test(path)
         ? ' BTC'
         : ''
+  const decimals = currency
+    ? 2
+    : percentage || /(temperature|\btemp\b|feels.?like|rate|ratio)/.test(path)
+      ? 1
+      : /\bbtc\b/.test(path) && !/price/.test(path)
+        ? 4
+        : 0
   return {
     ...DEFAULT_FORMAT,
     currency,
     suffix,
-    decimals: numeric && !Number.isInteger(variable.value) ? (currency ? 2 : 1) : 0,
+    decimals: numeric ? decimals : 0,
     percentage
   }
 }
@@ -786,11 +826,12 @@ function variableText(variable: TemplateVariable, overrides: Partial<TextPropert
 }
 
 function dateNode(variable: TemplateVariable | undefined, color: string, fontSize = 11) {
+  if (!variable) return gap(0)
   const element = createElement('date')
-  element.name = variable?.label || 'Current date'
+  element.name = variable.label
   Object.assign(element.properties as DateProperties, {
-    sourceType: variable ? 'variable' : 'now',
-    variable: variable?.path || '',
+    sourceType: 'variable',
+    variable: variable.path,
     dateFormat: 'EEE, MMM d',
     relativeDate: false,
     color,
@@ -809,28 +850,31 @@ function weatherSymbol(context: TemplateContext) {
   return 'sun.max.fill'
 }
 
-function symbolName(context: TemplateContext) {
+function symbolName(context: TemplateContext, variantKey = '') {
+  const variant = hashSeed(variantKey) % 3
   if (context.domain === 'weather') return weatherSymbol(context)
-  if (context.domain === 'expense') return 'wallet.pass.fill'
+  if (context.domain === 'expense') return ['wallet.pass.fill', 'creditcard.fill', 'banknote.fill'][variant]!
   if (context.domain === 'market') {
     const sample = context.variables.map(variable => `${variable.path} ${String(variable.value)}`).join(' ').toLowerCase()
-    return /(bitcoin|\bbtc\b)/.test(sample) ? 'bitcoinsign.circle' : 'chart.line.uptrend.xyaxis'
+    if (/(bitcoin|\bbtc\b)/.test(sample)) return ['bitcoinsign.square.fill', 'bitcoinsign.circle', 'chart.line.uptrend.xyaxis'][variant]!
+    return ['chart.line.uptrend.xyaxis', 'chart.xyaxis.line', 'waveform.path.ecg'][variant]!
   }
-  if (context.domain === 'schedule') return isCountdownContext(context) ? 'timer' : 'calendar'
-  if (context.domain === 'status') return 'gauge.with.dots.needle.67percent'
-  return 'chart.bar.fill'
+  if (context.domain === 'schedule') return isCountdownContext(context) ? ['timer', 'hourglass', 'clock.fill'][variant]! : ['calendar', 'calendar.badge.clock', 'clock.fill'][variant]!
+  if (context.domain === 'status') return ['gauge.with.dots.needle.67percent', 'waveform.path.ecg', 'bolt.fill'][variant]!
+  return ['chart.bar.fill', 'circle.grid.2x2.fill', 'square.grid.2x2.fill'][variant]!
 }
 
 function symbolNode(context: TemplateContext, color: string, size = 18) {
   const element = createElement('image')
   element.name = `${TEMPLATE_DOMAIN_LABELS[context.domain]} symbol`
   Object.assign(element.properties as ImageProperties, {
-    systemSymbol: symbolName(context),
+    systemSymbol: symbolName(context, color),
     width: size,
     height: size,
     tintColor: color,
     cornerRadius: 0
   })
+  generatedElementRoles.set(element, 'accent-symbol')
   return element
 }
 
@@ -1099,21 +1143,19 @@ function primaryWidthRatio(template: WidgetTemplate) {
   return 0.92
 }
 
-function safePrimaryFontSize(variable: TemplateVariable, template: WidgetTemplate, desiredSize: number, padding: number) {
+function safePrimaryFontSize(variable: TemplateVariable, template: WidgetTemplate, desiredSize: number, padding: number, format: TextProperties['format']) {
   const width = template.size === 'small' ? 158 : 338
   const contentWidth = Math.max(40, width - padding * 2)
-  const formatted = formatPreviewValue(variable.value, inferredFormat(variable))
+  const formatted = formatPreviewValue(variable.value, format)
   const reservedCharacters = typeof variable.value === 'number' ? 1 : 0
   const characterCount = Math.max(1, formatted.length + reservedCharacters)
   const characterWidth = template.typography === 'monospaced' ? 0.62 : template.typography === 'serif' ? 0.56 : 0.58
   const safeSize = Math.floor((contentWidth * primaryWidthRatio(template)) / (characterCount * characterWidth))
-  return Math.max(8, Math.min(desiredSize, safeSize))
+  return Math.max(16, Math.min(desiredSize, safeSize))
 }
 
-function applyGeneratedStyle(root: WidgetElement, template: WidgetTemplate, primary: TemplateVariable) {
-  const densityScale = template.density === 'dense' ? 0.78 : template.density === 'minimal' ? 1.08 : 1
-  const supportingTypeScale = template.density === 'dense' ? 0.86 : 1
-  const primaryTypeScale = template.density === 'minimal' ? 1.12 : template.density === 'dense' ? 0.92 : 1
+function applyGeneratedStyle(root: WidgetElement, template: WidgetTemplate, context: TemplateContext) {
+  const primary = context.primary
   const widgetPadding = root.type === 'widget' ? (root.properties as WidgetProperties).padding : 0
   const generatedPalette = root.type === 'widget' && (root.properties as WidgetProperties).backgroundImageMode !== 'none'
     ? COUNTDOWN_IMAGE_PALETTE
@@ -1122,19 +1164,7 @@ function applyGeneratedStyle(root: WidgetElement, template: WidgetTemplate, prim
   const visit = (element: WidgetElement) => {
     if (element.type === 'widget') {
       const properties = element.properties as WidgetProperties
-      properties.padding = Math.max(0, Math.round(properties.padding * (template.density === 'dense' ? 0.88 : 1)))
       if (properties.backgroundImageMode === 'none') properties.backgroundOpacity = template.backgroundOpacity
-    }
-
-    if (element.type === 'verticalStack' || element.type === 'horizontalStack') {
-      const properties = element.properties as StackProperties
-      properties.spacing = Math.max(0, Math.round(properties.spacing * densityScale))
-      properties.padding = Math.max(0, Math.round(properties.padding * densityScale))
-    }
-
-    if (element.type === 'spacer') {
-      const properties = element.properties as SpacerProperties
-      if (properties.mode === 'fixed') properties.size = Math.max(2, Math.round(properties.size * densityScale))
     }
 
     if (element.type === 'text') {
@@ -1144,21 +1174,25 @@ function applyGeneratedStyle(root: WidgetElement, template: WidgetTemplate, prim
       if (isVariable || template.typography === 'monospaced' || template.typography === 'serif') {
         properties.font = template.typography
       }
-      const scaledFontSize = Math.max(8, Math.round(properties.fontSize * (isPrimary ? primaryTypeScale : supportingTypeScale)))
-      properties.fontSize = isPrimary
-        ? safePrimaryFontSize(primary, template, scaledFontSize, widgetPadding)
-        : scaledFontSize
+      properties.fontSize = Math.max(9, Math.round(properties.fontSize))
+      if (isPrimary && typeof primary.value === 'number' && template.size !== 'large') properties.format.compact = true
+      if (isPrimary) properties.fontSize = safePrimaryFontSize(primary, template, properties.fontSize, widgetPadding, properties.format)
 
       if (isPrimary && template.emphasis === 'vivid') properties.color = generatedPalette.accent
-      if (template.emphasis === 'quiet' && properties.color === generatedPalette.accent) {
-        properties.color = isPrimary ? generatedPalette.foreground : generatedPalette.muted
+      if (isVariable) {
+        const variable = context.variables.find(candidate => candidate.path === properties.variable)
+        if (variable && /(change|delta|profit|\bpnl\b|gain|loss)/.test(normalizedPath(variable.path)) && typeof variable.value === 'number') {
+          properties.color = variable.value < 0 ? NEGATIVE_COLOR : POSITIVE_COLOR
+          properties.format.prefix = `${variable.value < 0 ? '▼' : '▲'} ${properties.format.prefix}`
+        }
       }
+      if (generatedElementRoles.get(element) === 'label') properties.opacity = 1
     }
 
     if (element.type === 'date') {
       const properties = element.properties as DateProperties
       properties.font = template.typography === 'rounded' ? 'system' : template.typography
-      properties.fontSize = Math.max(8, Math.round(properties.fontSize * supportingTypeScale))
+      properties.fontSize = Math.max(9, Math.round(properties.fontSize))
     }
 
     if (element.type === 'image') {
@@ -1166,8 +1200,10 @@ function applyGeneratedStyle(root: WidgetElement, template: WidgetTemplate, prim
       if (properties.sourceType === 'symbol') {
         properties.width = Math.max(12, Math.round(properties.width * template.symbolScale))
         properties.height = Math.max(12, Math.round(properties.height * template.symbolScale))
-        properties.opacity = template.emphasis === 'quiet' ? 0.72 : 1
-        properties.tintColor = template.emphasis === 'quiet' ? generatedPalette.muted : generatedPalette.accent
+        properties.opacity = template.emphasis === 'quiet' ? 0.8 : 1
+        properties.tintColor = template.emphasis === 'quiet' && generatedElementRoles.get(element) === 'accent-symbol'
+          ? generatedPalette.muted
+          : properties.tintColor
       }
     }
 
@@ -1178,11 +1214,28 @@ function applyGeneratedStyle(root: WidgetElement, template: WidgetTemplate, prim
 }
 
 function metricColumn(variable: TemplateVariable, palette: TemplatePalette, valueSize = 16, align: StackProperties['alignment'] = 'leading') {
-  return stack('verticalStack', variable.label, [
+  const children = [
     staticText(variable.label, { color: palette.muted, fontSize: 10, weight: 'medium', alignment: align }),
     gap(4),
     variableText(variable, { color: palette.foreground, fontSize: valueSize, weight: 'semibold', alignment: align })
-  ], { alignment: align })
+  ]
+  const progress = progressBar(variable, palette, align)
+  if (progress) children.push(gap(5), progress)
+  return stack('verticalStack', variable.label, children, { alignment: align })
+}
+
+function progressBar(variable: TemplateVariable, palette: TemplatePalette, align: StackProperties['alignment'] = 'leading') {
+  if (typeof variable.value !== 'number' || !/(battery|charge|progress|completion|percent|percentage)/.test(normalizedPath(variable.path))) return
+  const ratio = Math.max(0, Math.min(1, Math.abs(variable.value) <= 1 ? variable.value : variable.value / 100))
+  const filled = Math.round(ratio * 8)
+  return stack('horizontalStack', `${variable.label} progress`, Array.from({ length: 8 }, (_, index) => (
+    staticText('━', {
+      color: index < filled ? palette.accent : palette.muted,
+      fontSize: 9,
+      weight: 'bold',
+      alignment: align
+    })
+  )), { alignment: align })
 }
 
 function metricRow(variable: TemplateVariable, palette: TemplatePalette, prominent = false) {
@@ -1199,11 +1252,39 @@ function metricRow(variable: TemplateVariable, palette: TemplatePalette, promine
   ])
 }
 
+function accentRule(palette: TemplatePalette) {
+  return stack('horizontalStack', 'Accent rule', [flexibleSpace()], {
+    padding: 1,
+    backgroundColor: palette.accent,
+    cornerRadius: 1
+  })
+}
+
+function labelChip(label: string, palette: TemplatePalette, font: TextProperties['font'] = 'system') {
+  return stack('horizontalStack', `${label} chip`, [
+    staticText(label, { color: palette.accentForeground, font, fontSize: 9, weight: 'bold' })
+  ], { padding: 6, backgroundColor: palette.accent, cornerRadius: 7 })
+}
+
+function metricCard(variable: TemplateVariable, palette: TemplatePalette, valueSize: number, align: StackProperties['alignment']) {
+  return stack('verticalStack', `${variable.label} card`, [
+    staticText(variable.label, { color: palette.accentForeground, fontSize: 9, weight: 'semibold', alignment: align }),
+    gap(4),
+    variableText(variable, { color: palette.accentForeground, fontSize: valueSize, weight: 'bold', alignment: align })
+  ], { alignment: align, padding: 10, backgroundColor: palette.accent, cornerRadius: 10 })
+}
+
+function densityValue<T>(template: WidgetTemplate, minimal: T, balanced: T, dense: T) {
+  return template.density === 'minimal' ? minimal : template.density === 'dense' ? dense : balanced
+}
+
 function buildFocus(template: WidgetTemplate, context: TemplateContext): BuiltWidgetTemplate {
   const { size, palette } = template
   const support = context.supporting.slice(0, size === 'large' ? 3 : size === 'medium' ? 2 : 1)
   const valueSize = size === 'large' ? 48 : size === 'medium' ? 38 : 30
   const children: WidgetElement[] = [
+    accentRule(palette),
+    gap(densityValue(template, 12, 9, 7)),
     stack('horizontalStack', 'Header', [
       symbolNode(context, palette.accent, size === 'large' ? 21 : 17), gap(7),
       staticText(context.primary.label, { color: palette.muted, fontSize: 10, weight: 'medium' }),
@@ -1212,6 +1293,8 @@ function buildFocus(template: WidgetTemplate, context: TemplateContext): BuiltWi
     flexibleSpace(),
     variableText(context.primary, { color: palette.foreground, fontSize: valueSize, weight: 'bold' })
   ]
+  const primaryProgress = progressBar(context.primary, palette)
+  if (primaryProgress) children.push(gap(7), primaryProgress)
 
   if (support.length) {
     children.push(gap(size === 'large' ? 20 : 10))
@@ -1244,11 +1327,11 @@ function buildSymbol(template: WidgetTemplate, context: TemplateContext): BuiltW
 
   if (size === 'medium') {
     content = stack('horizontalStack', template.name, [
-      stack('verticalStack', 'Symbol column', [
-        symbolNode(context, palette.accent, 44),
+      stack('verticalStack', 'Accent symbol panel', [
+        symbolNode(context, palette.accentForeground, 44),
         flexibleSpace(),
-        dateNode(context.date, palette.muted, 10)
-      ]),
+        dateNode(context.date, palette.accentForeground, 10)
+      ], { padding: 14, backgroundColor: palette.accent, cornerRadius: 14 }),
       flexibleSpace(),
       stack('verticalStack', 'Value column', [
         staticText(context.primary.label, { color: palette.muted, fontSize: 10, weight: 'medium', alignment: 'trailing' }),
@@ -1264,7 +1347,7 @@ function buildSymbol(template: WidgetTemplate, context: TemplateContext): BuiltW
       rows.push(metricRow(variable, palette))
     })
     content = stack('verticalStack', template.name, [
-      stack('horizontalStack', 'Header', [dateNode(context.date, palette.muted, 10), flexibleSpace(), symbolNode(context, palette.accent, size === 'large' ? 52 : 34)]),
+      stack('horizontalStack', 'Header', [dateNode(context.date, palette.muted, 10), flexibleSpace(), stack('horizontalStack', 'Symbol tile', [symbolNode(context, palette.accentForeground, size === 'large' ? 52 : 34)], { padding: 9, backgroundColor: palette.accent, cornerRadius: 12 })]),
       flexibleSpace(),
       staticText(context.primary.label, { color: palette.muted, fontSize: 10, weight: 'medium' }),
       gap(5),
@@ -1317,7 +1400,7 @@ function buildStrip(template: WidgetTemplate, context: TemplateContext): BuiltWi
   const selected = [context.primary, ...context.supporting].slice(0, size === 'small' ? 2 : size === 'medium' ? 3 : 5)
   const children: WidgetElement[] = [
     stack('horizontalStack', 'Header', [
-      staticText(context.primary.label, { color: palette.foreground, fontSize: 11 }),
+      staticText(template.name, { color: palette.foreground, fontSize: 11 }),
       flexibleSpace(),
       symbolNode(context, palette.accent, 17)
     ]),
@@ -1331,7 +1414,9 @@ function buildStrip(template: WidgetTemplate, context: TemplateContext): BuiltWi
     const stripChildren: WidgetElement[] = []
     selected.slice(0, 3).forEach((variable, index) => {
       if (index) stripChildren.push(flexibleSpace())
-      stripChildren.push(metricColumn(variable, palette, index === 0 ? (size === 'large' ? 31 : 25) : (size === 'large' ? 19 : 15), index === selected.slice(0, 3).length - 1 ? 'trailing' : 'leading'))
+      const alignment = index === selected.slice(0, 3).length - 1 ? 'trailing' : 'leading'
+      const valueSize = index === 0 ? (size === 'large' ? 31 : 25) : (size === 'large' ? 19 : 15)
+      stripChildren.push(index === 0 ? metricCard(variable, palette, valueSize, alignment) : metricColumn(variable, palette, valueSize, alignment))
     })
     children.push(stack('horizontalStack', 'Metric line', stripChildren))
     if (size === 'large') {
@@ -1377,8 +1462,7 @@ function buildTicker(template: WidgetTemplate, context: TemplateContext): BuiltW
   const support = context.supporting.slice(0, size === 'large' ? 4 : size === 'medium' ? 2 : 1)
   const children: WidgetElement[] = [
     stack('horizontalStack', 'Header', [
-      symbolNode(context, palette.accent, 18), gap(8),
-      staticText(context.primary.label, { color: palette.accent, font: 'monospaced', fontSize: 10, weight: 'semibold' }),
+      labelChip(context.primary.label, palette, 'monospaced'),
       flexibleSpace(), dateNode(context.date, palette.muted, 10)
     ]),
     flexibleSpace(),
@@ -1418,6 +1502,8 @@ function buildEditorial(template: WidgetTemplate, context: TemplateContext): Bui
       flexibleSpace(),
       symbolNode(context, palette.accent, 15)
     ]),
+    gap(8),
+    accentRule(palette),
     gap(size === 'large' ? 30 : 13),
     staticText(context.primary.label, { color: palette.accent, font: 'serif', fontSize: size === 'large' ? 17 : 13, weight: 'semibold' }),
     gap(6),
@@ -1460,7 +1546,7 @@ function buildBand(template: WidgetTemplate, context: TemplateContext): BuiltWid
     support.forEach((variable, index) => {
       if (index) bandChildren.push(flexibleSpace())
       bandChildren.push(stack('verticalStack', variable.label, [
-        staticText(variable.label, { color: palette.accentForeground, fontSize: 9, weight: 'medium', opacity: 0.72, alignment: index === support.length - 1 ? 'trailing' : 'leading' }),
+        staticText(variable.label, { color: palette.accentForeground, fontSize: 9, weight: 'medium', alignment: index === support.length - 1 ? 'trailing' : 'leading' }),
         gap(3),
         variableText(variable, { color: palette.accentForeground, fontSize: size === 'large' ? 16 : 13, weight: 'semibold', alignment: index === support.length - 1 ? 'trailing' : 'leading' })
       ], { alignment: index === support.length - 1 ? 'trailing' : 'leading' }))
@@ -1551,6 +1637,8 @@ function buildCenter(template: WidgetTemplate, context: TemplateContext): BuiltW
     gap(size === 'large' ? 5 : 4),
     variableText(context.primary, { color: palette.foreground, fontSize: size === 'large' ? 50 : size === 'medium' ? 35 : 28, alignment: 'center' })
   ]
+  const primaryProgress = progressBar(context.primary, palette, 'center')
+  if (primaryProgress) children.push(gap(7), primaryProgress)
 
   if (support.length) {
     children.push(gap(size === 'large' ? 24 : size === 'medium' ? 8 : 7))
@@ -1679,7 +1767,7 @@ function buildCorner(template: WidgetTemplate, context: TemplateContext): BuiltW
   const support = context.supporting.slice(0, size === 'large' ? 2 : 1)
   const children: WidgetElement[] = [
     stack('horizontalStack', 'Header', [
-      staticText(context.primary.label, { color: palette.muted, fontSize: 10, weight: 'medium' }),
+      labelChip(context.primary.label, palette),
       flexibleSpace(),
       dateNode(context.date, palette.muted, 10)
     ]),
@@ -1724,7 +1812,8 @@ function buildTriptych(template: WidgetTemplate, context: TemplateContext): Buil
 function buildMinimal(template: WidgetTemplate, context: TemplateContext): BuiltWidgetTemplate {
   const { size, palette } = template
   const children: WidgetElement[] = [
-    stack('horizontalStack', 'Dateline', [dateNode(context.date, palette.muted, 10), flexibleSpace()]),
+    accentRule(palette),
+    ...(context.date ? [gap(9), stack('horizontalStack', 'Dateline', [dateNode(context.date, palette.muted, 10), flexibleSpace()])] : []),
     flexibleSpace(),
     staticText(context.primary.label, { color: palette.muted, fontSize: size === 'large' ? 13 : 10, weight: 'medium' }),
     gap(size === 'large' ? 10 : 6),
@@ -1738,6 +1827,27 @@ function buildMinimal(template: WidgetTemplate, context: TemplateContext): Built
   }
 }
 
+type TemplateBuilder = (template: WidgetTemplate, context: TemplateContext) => BuiltWidgetTemplate
+
+const TEMPLATE_BUILDERS: Record<TemplateRecipe, TemplateBuilder> = {
+  focus: buildFocus,
+  symbol: buildSymbol,
+  split: buildSplit,
+  strip: buildStrip,
+  ledger: buildLedger,
+  ticker: buildTicker,
+  editorial: buildEditorial,
+  band: buildBand,
+  horizontal: buildHorizontal,
+  center: buildCenter,
+  matrix: buildMatrix,
+  rail: buildRail,
+  stacked: buildStacked,
+  corner: buildCorner,
+  triptych: buildTriptych,
+  minimal: buildMinimal
+}
+
 export function buildWidgetTemplate(
   template: WidgetTemplate,
   document: EditorDocument,
@@ -1747,24 +1857,9 @@ export function buildWidgetTemplate(
   let built: BuiltWidgetTemplate
 
   if (isCountdownContext(context)) built = buildCountdown(template, context, options)
-  else if (template.recipe === 'focus') built = buildFocus(template, context)
-  else if (template.recipe === 'symbol') built = buildSymbol(template, context)
-  else if (template.recipe === 'split') built = buildSplit(template, context)
-  else if (template.recipe === 'strip') built = buildStrip(template, context)
-  else if (template.recipe === 'ledger') built = buildLedger(template, context)
-  else if (template.recipe === 'ticker') built = buildTicker(template, context)
-  else if (template.recipe === 'editorial') built = buildEditorial(template, context)
-  else if (template.recipe === 'band') built = buildBand(template, context)
-  else if (template.recipe === 'horizontal') built = buildHorizontal(template, context)
-  else if (template.recipe === 'center') built = buildCenter(template, context)
-  else if (template.recipe === 'matrix') built = buildMatrix(template, context)
-  else if (template.recipe === 'rail') built = buildRail(template, context)
-  else if (template.recipe === 'stacked') built = buildStacked(template, context)
-  else if (template.recipe === 'corner') built = buildCorner(template, context)
-  else if (template.recipe === 'triptych') built = buildTriptych(template, context)
-  else built = buildMinimal(template, context)
+  else built = TEMPLATE_BUILDERS[template.recipe](template, context)
 
-  applyGeneratedStyle(built.root, template, context.primary)
+  applyGeneratedStyle(built.root, template, context)
   return built
 }
 

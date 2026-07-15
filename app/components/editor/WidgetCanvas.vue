@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
+import { colorForPreview } from '~/utils/editor'
 import type { PreviewSize, WidgetProperties } from '~/types/editor'
 
 const props = defineProps<{
@@ -49,7 +50,7 @@ const backgroundImageUrl = computed(() => {
 })
 
 const backgroundStyle = computed<CSSProperties>(() => ({
-  backgroundColor: properties.value.backgroundColor,
+  backgroundColor: colorForPreview(properties.value.backgroundColor),
   backgroundImage: backgroundImageUrl.value ? `url(${JSON.stringify(backgroundImageUrl.value)})` : undefined,
   backgroundPosition: 'center',
   backgroundRepeat: 'no-repeat',

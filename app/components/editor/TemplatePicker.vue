@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
+import { colorForPreview } from '~/utils/editor'
 import type { EditorDocument, PreviewSize, WidgetProperties } from '~/types/editor'
 import type { TemplateContentOptions, WidgetTemplate } from '~/utils/templates'
 import {
@@ -98,7 +99,7 @@ function previewBackgroundStyle(root: EditorDocument['layouts'][PreviewSize]): C
       ? String(resolveVariable(properties.backgroundImageVariable) || properties.backgroundImageFallbackUrl || '')
       : ''
   return {
-    backgroundColor: properties.backgroundColor,
+    backgroundColor: colorForPreview(properties.backgroundColor),
     backgroundImage: imageUrl ? `url(${JSON.stringify(imageUrl)})` : undefined,
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
@@ -313,7 +314,7 @@ function openJson() {
                 :aria-selected="selectedTemplateId === item.template.id"
                 @click="selectedTemplateId = item.template.id"
               >
-                <span class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-default shadow-sm" :style="{ color: item.template.accent }">
+                <span class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-default shadow-sm" :style="{ color: colorForPreview(item.template.accent) }">
                   <UIcon :name="item.template.icon" class="size-4" />
                 </span>
                 <span class="min-w-0 flex-1">
