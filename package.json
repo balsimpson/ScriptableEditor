@@ -1,0 +1,24 @@
+{
+  "name": "scriptable-widget-studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "typecheck": "nuxt typecheck",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "latest",
+    "@nuxt/ui": "latest",
+    "@vueuse/integrations": "^14.3.0",
+    "nuxt": "latest",
+    "sortablejs": "^1.15.7",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "@types/sortablejs": "^1.15.9",
+    "typescript": "latest",
+    "vue-tsc": "^3.3.7"
+  }
+}

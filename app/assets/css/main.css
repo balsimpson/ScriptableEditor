@@ -1,0 +1,423 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: "Spline Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+  --color-iris-50: #f3f1ff;
+  --color-iris-100: #e9e5ff;
+  --color-iris-200: #d6ceff;
+  --color-iris-300: #b8a8ff;
+  --color-iris-400: #9d89ff;
+  --color-iris-500: #8b7cff;
+  --color-iris-600: #705ce9;
+  --color-iris-700: #5c49c7;
+  --color-iris-800: #4b3da1;
+  --color-iris-900: #40367f;
+  --color-iris-950: #251e4a;
+}
+
+:root {
+  --ui-radius: 0.3125rem;
+  --studio-chrome: #e8edf3;
+  --studio-panel: #f4f7fa;
+  --studio-canvas: #dfe5ec;
+  --studio-canvas-deep: #d4dce5;
+  --studio-grid: rgba(52, 67, 84, 0.1);
+  --studio-grid-major: rgba(52, 67, 84, 0.15);
+  --studio-ink: #101721;
+  --studio-ruler: rgba(46, 59, 74, 0.5);
+  --studio-glow: rgba(112, 92, 233, 0.1);
+  --studio-shadow: rgba(20, 28, 40, 0.26);
+  --studio-status: #148f7c;
+}
+
+.dark {
+  --studio-chrome: #080b10;
+  --studio-panel: #0d131b;
+  --studio-canvas: #111a24;
+  --studio-canvas-deep: #0b1118;
+  --studio-grid: rgba(159, 177, 198, 0.055);
+  --studio-grid-major: rgba(159, 177, 198, 0.09);
+  --studio-ink: #e7ecf3;
+  --studio-ruler: rgba(171, 187, 207, 0.48);
+  --studio-glow: rgba(139, 124, 255, 0.15);
+  --studio-shadow: rgba(0, 0, 0, 0.62);
+  --studio-status: #63d5ba;
+
+  --ui-bg: #0d131b;
+  --ui-bg-muted: #111923;
+  --ui-bg-elevated: #151e29;
+  --ui-bg-accented: #1c2633;
+  --ui-bg-inverted: #e7ecf3;
+  --ui-border: #263242;
+  --ui-border-muted: #1d2835;
+  --ui-border-accented: #344255;
+  --ui-text-dimmed: #647184;
+  --ui-text-muted: #8591a1;
+  --ui-text-toned: #a7b1bf;
+  --ui-text: #cbd3dd;
+  --ui-text-highlighted: #f1f4f8;
+  --ui-text-inverted: #111721;
+}
+
+html,
+body,
+#__nuxt {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--studio-chrome);
+  color: var(--studio-ink);
+  font-feature-settings: "ss01" 1, "cv11" 1;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.studio-grid {
+  background-color: var(--studio-canvas);
+  background-image:
+    linear-gradient(var(--studio-grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--studio-grid-major) 1px, transparent 1px),
+    linear-gradient(var(--studio-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--studio-grid) 1px, transparent 1px);
+  background-position: -1px -1px;
+  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+}
+
+.studio-workbench {
+  isolation: isolate;
+  position: relative;
+  background-image:
+    radial-gradient(circle at 50% 48%, var(--studio-glow), transparent 32%),
+    linear-gradient(var(--studio-grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--studio-grid-major) 1px, transparent 1px),
+    linear-gradient(var(--studio-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--studio-grid) 1px, transparent 1px);
+  background-position: center, -1px -1px, -1px -1px, -1px -1px, -1px -1px;
+  background-size: auto, 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+}
+
+.studio-workbench::before,
+.studio-workbench::after {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+  opacity: 0.52;
+}
+
+.studio-workbench::before {
+  inset-block: 0;
+  left: 50%;
+  border-left: 1px dashed var(--studio-grid-major);
+}
+
+.studio-workbench::after {
+  inset-inline: 0;
+  top: 50%;
+  border-top: 1px dashed var(--studio-grid-major);
+}
+
+.workbench-ruler {
+  position: absolute;
+  z-index: 1;
+  color: var(--studio-ruler);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.workbench-ruler-x {
+  inset-inline: 32px;
+  top: 18px;
+  height: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--studio-ruler) 30%, transparent);
+  background-image: repeating-linear-gradient(90deg, var(--studio-ruler) 0 1px, transparent 1px 24px);
+  background-size: auto 5px;
+  background-repeat: repeat-x;
+}
+
+.workbench-ruler-y {
+  inset-block: 32px;
+  left: 18px;
+  width: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--studio-ruler) 30%, transparent);
+  background-image: repeating-linear-gradient(var(--studio-ruler) 0 1px, transparent 1px 24px);
+  background-size: 5px auto;
+  background-repeat: repeat-y;
+}
+
+.workbench-ruler-label {
+  position: absolute;
+  top: 30px;
+  right: 34px;
+  z-index: 1;
+  color: var(--studio-ruler);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.widget-stage {
+  box-shadow:
+    0 32px 90px var(--studio-shadow),
+    0 3px 12px color-mix(in srgb, var(--studio-shadow) 72%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.studio-mark {
+  position: relative;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 48%, var(--ui-border));
+  border-radius: 5px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--ui-primary) 19%, transparent), transparent 62%),
+    var(--studio-panel);
+  color: var(--ui-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-primary) 8%, transparent);
+}
+
+.studio-mark::before,
+.studio-mark::after {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-color: var(--ui-primary);
+  content: "";
+}
+
+.studio-mark::before {
+  top: -2px;
+  left: -2px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+
+.studio-mark::after {
+  right: -2px;
+  bottom: -2px;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+}
+
+.studio-mark-lg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.studio-panel-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.studio-tree-row {
+  position: relative;
+  border-radius: 3px;
+}
+
+.studio-tree-row-selected::before {
+  position: absolute;
+  inset-block: 5px;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--ui-primary);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ui-primary) 50%, transparent);
+  content: "";
+}
+
+[data-layer-sortable-item] {
+  touch-action: pan-y;
+}
+
+[data-layer-drag-handle] {
+  touch-action: none;
+}
+
+.studio-mobile-dock {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.layer-drop-list:empty {
+  min-height: 2px;
+}
+
+.layer-tree-is-dragging .layer-drop-list:empty {
+  min-height: 24px;
+  margin-block: 2px;
+  margin-left: var(--layer-drop-indent);
+  border: 1px dashed color-mix(in srgb, var(--ui-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--ui-primary) 5%, transparent);
+}
+
+.layer-tree-is-dragging .layer-drop-list:empty::after {
+  display: grid;
+  height: 22px;
+  place-items: center start;
+  padding-inline: 7px;
+  color: var(--ui-text-dimmed);
+  content: "Drop into stack";
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.layer-drop-target {
+  background: color-mix(in srgb, var(--ui-primary) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--ui-primary);
+}
+
+.layer-drag-ghost > .studio-tree-row {
+  opacity: 0.28;
+  background: color-mix(in srgb, var(--ui-primary) 12%, transparent);
+}
+
+.layer-drag-chosen > .studio-tree-row,
+.layer-drag-active > .studio-tree-row {
+  cursor: grabbing;
+}
+
+.studio-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--studio-ruler) 55%, transparent) transparent;
+}
+
+.studio-scrollbar::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.studio-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--studio-ruler) 55%, transparent);
+}
+
+.checkerboard {
+  background-color: var(--ui-bg);
+  background-image:
+    linear-gradient(45deg, var(--ui-bg-accented) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--ui-bg-accented) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--ui-bg-accented) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--ui-bg-accented) 75%);
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  background-size: 12px 12px;
+}
+
+[data-canvas-sortable-item] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvas-stack-drag-handle {
+  position: absolute !important;
+  z-index: 20;
+  top: 2px;
+  right: 2px;
+  width: 20px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  padding: 0 !important;
+  cursor: grab;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.canvas-stack-drag-handle-visible,
+.canvas-stack-node:hover > .canvas-stack-drag-handle,
+.canvas-stack-drag-handle:focus-visible {
+  opacity: 0.92;
+  transform: scale(1);
+}
+
+.canvas-stack-drag-handle:active {
+  cursor: grabbing;
+}
+
+.canvas-is-dragging .canvas-stack-drag-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-canvas-drop-list]:empty {
+  min-width: 10px !important;
+  min-height: 10px !important;
+}
+
+.canvas-node-selected {
+  outline: 1px solid var(--ui-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 9%, transparent);
+}
+
+.canvas-is-dragging [data-canvas-drop-list] {
+  transition: outline-color 120ms ease, background-color 120ms ease;
+}
+
+.canvas-is-dragging [data-canvas-drop-list]:empty {
+  display: grid !important;
+  min-width: 30px !important;
+  min-height: 24px !important;
+  place-items: center;
+  outline: 1px dashed color-mix(in srgb, var(--ui-primary) 65%, transparent);
+  outline-offset: -2px;
+}
+
+.canvas-is-dragging [data-canvas-drop-list]:empty::after {
+  content: "Drop";
+  color: color-mix(in srgb, var(--ui-primary) 80%, white);
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.canvas-drop-target {
+  background-color: color-mix(in srgb, var(--ui-primary) 10%, transparent) !important;
+  outline: 1px solid color-mix(in srgb, var(--ui-primary) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.canvas-drag-ghost {
+  opacity: 0.25;
+}
+
+.canvas-drag-chosen,
+.canvas-drag-active {
+  cursor: grabbing !important;
+  filter: saturate(0.75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
