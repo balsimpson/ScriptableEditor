@@ -12,6 +12,7 @@
   "dependencies": {
     "@iconify-json/lucide": "latest",
     "@nuxt/ui": "latest",
+    "@vercel/analytics": "^2.0.1",
     "@vueuse/integrations": "^14.3.0",
     "nuxt": "latest",
     "sortablejs": "^1.15.7",
