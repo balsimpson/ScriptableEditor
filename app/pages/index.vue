@@ -4,14 +4,14 @@ import { getBindingIssues } from '~/utils/bindings'
 import { ELEMENT_LABELS } from '~/utils/editor'
 
 useSeoMeta({
-  title: 'Scriptable Widget Studio',
-  description: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.',
-  ogTitle: 'Scriptable Widget Studio',
-  ogDescription: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.',
+  title: 'Drag and drop Scriptable widget builder',
+  description: 'Drag and drop Scriptable widgets, preview layouts live, and export clean JavaScript.',
+  ogTitle: 'Widget Studio - Drag and drop Scriptable widgets',
+  ogDescription: 'Drag and drop Scriptable widgets, preview layouts live, and export clean JavaScript.',
   ogType: 'website',
   twitterCard: 'summary_large_image',
-  twitterTitle: 'Scriptable Widget Studio',
-  twitterDescription: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
+  twitterTitle: 'Widget Studio - Drag and drop Scriptable widgets',
+  twitterDescription: 'Drag and drop Scriptable widgets, preview layouts live, and export clean JavaScript.'
 })
 
 const {

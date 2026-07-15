@@ -18,12 +18,16 @@ export default defineNuxtConfig({
       htmlAttrs: {
         lang: 'en'
       },
-      title: 'Scriptable Widget Studio',
-      titleTemplate: '%s · Scriptable Widget Studio',
+      title: 'Widget Studio',
+      titleTemplate: '%s · Widget Studio',
       meta: [
         {
           name: 'description',
-          content: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
+          content: 'Drag and drop Scriptable widgets, preview layouts live, and export clean JavaScript.'
+        },
+        {
+          name: 'keywords',
+          content: 'Scriptable widgets, widget builder, visual editor, drag and drop, iPhone widgets, JavaScript'
         },
         {
           name: 'robots',
@@ -31,11 +35,11 @@ export default defineNuxtConfig({
         },
         {
           name: 'application-name',
-          content: 'Scriptable Widget Studio'
+          content: 'Widget Studio'
         },
         {
           name: 'apple-mobile-web-app-title',
-          content: 'Scriptable Widget Studio'
+          content: 'Widget Studio'
         },
         {
           name: 'format-detection',
@@ -57,15 +61,15 @@ export default defineNuxtConfig({
         },
         {
           property: 'og:site_name',
-          content: 'Scriptable Widget Studio'
+          content: 'Widget Studio'
         },
         {
           property: 'og:title',
-          content: 'Scriptable Widget Studio'
+          content: 'Widget Studio - Drag and drop Scriptable widgets'
         },
         {
           property: 'og:description',
-          content: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
+          content: 'Drag and drop Scriptable widgets, preview layouts live, and export clean JavaScript.'
         },
         {
           name: 'twitter:card',
@@ -73,11 +77,11 @@ export default defineNuxtConfig({
         },
         {
           name: 'twitter:title',
-          content: 'Scriptable Widget Studio'
+          content: 'Widget Studio - Drag and drop Scriptable widgets'
         },
         {
           name: 'twitter:description',
-          content: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
+          content: 'Drag and drop Scriptable widgets, preview layouts live, and export clean JavaScript.'
         }
       ]
     }
