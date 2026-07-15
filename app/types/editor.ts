@@ -26,6 +26,7 @@ export interface NumberFormatOptions {
 
 export interface WidgetProperties {
   backgroundColor: string
+  backgroundOpacity: number
   backgroundImageMode: 'none' | 'static' | 'variable'
   backgroundImageUrl: string
   backgroundImageVariable: string

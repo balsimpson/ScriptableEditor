@@ -82,7 +82,7 @@ function finishRename() {
     >
       <button
         type="button"
-        class="grid size-9 shrink-0 place-items-center rounded text-dimmed hover:text-default lg:size-5"
+        class="grid size-11 shrink-0 place-items-center rounded text-dimmed hover:text-default lg:size-5"
         :aria-label="element.collapsed ? 'Expand layer' : 'Collapse layer'"
         @click.stop="toggleCollapsed"
       >
@@ -106,7 +106,7 @@ function finishRename() {
         color="neutral"
         variant="ghost"
         size="xs"
-        class="size-9 cursor-grab justify-center p-0 opacity-75 active:cursor-grabbing lg:size-auto lg:opacity-45 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+        class="size-11 cursor-grab justify-center p-0 opacity-75 active:cursor-grabbing lg:size-auto lg:opacity-45 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
         :aria-label="`Move ${element.name}`"
         data-layer-drag-handle
         @click.stop
@@ -116,19 +116,22 @@ function finishRename() {
         v-if="renaming"
         ref="renameInput"
         v-model="element.name"
-        class="min-w-0 flex-1 rounded border border-primary bg-default px-1 text-sm outline-none"
+        class="min-w-0 flex-1 rounded border border-primary bg-default px-1 text-left text-sm outline-none"
         @click.stop
         @keydown.enter="finishRename"
         @keydown.escape="renaming = false"
         @blur="finishRename"
       >
-      <span
+      <button
         v-else
-        class="min-w-0 flex-1 truncate"
+        type="button"
+        class="min-w-0 flex-1 truncate text-left"
         :class="element.type === 'widget' ? '' : 'cursor-grab active:cursor-grabbing'"
         :data-layer-drag-handle="element.type === 'widget' ? undefined : ''"
+        :aria-label="`Edit ${element.name}`"
+        @click.stop="selectElement(element.id)"
         @dblclick.stop="startRename"
-      >{{ element.name }}</span>
+      >{{ element.name }}</button>
 
       <UBadge v-if="repeatCount > 1" :label="`×${repeatCount}`" color="primary" variant="subtle" size="sm" />
 
@@ -138,7 +141,7 @@ function finishRename() {
           color="neutral"
           variant="ghost"
           size="xs"
-          class="size-9 justify-center p-0 opacity-100 lg:size-auto lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+          class="size-11 justify-center p-0 opacity-100 lg:size-auto lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
           aria-label="Add child"
           @click.stop
         />
@@ -150,7 +153,7 @@ function finishRename() {
           color="neutral"
           variant="ghost"
           size="xs"
-          class="size-9 justify-center p-0 opacity-100 lg:size-auto lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
+          class="size-11 justify-center p-0 opacity-100 lg:size-auto lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100"
           aria-label="Layer actions"
           @click.stop
         />

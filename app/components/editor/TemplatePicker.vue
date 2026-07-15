@@ -10,18 +10,19 @@ import {
   generateWidgetTemplateOptions,
   getTemplateVariables,
   isCountdownDocument,
+  TEMPLATE_DENSITY_LABELS,
   TEMPLATE_DOMAIN_LABELS
 } from '~/utils/templates'
 
 const open = defineModel<boolean>('open', { default: false })
-const { document, selectedElementId, activeLeftTab } = useWidgetEditor()
+const { document, selectedElementId, activeLeftTab, resolveVariable } = useWidgetEditor()
 const toast = useToast()
 const targetSize = ref<PreviewSize>(document.value.activeSize)
 const generation = ref(0)
 const selectedTemplateId = ref('')
 const showCountdownLabel = ref(true)
+const showCountdownImage = ref(true)
 const countdownImageUrl = ref('')
-const optionSetCount = 4
 
 const sizes: { label: string, value: PreviewSize, icon: string }[] = [
   { label: 'Small', value: 'small', icon: 'i-lucide-square' },
@@ -44,6 +45,7 @@ const imageUrlError = computed(() => {
 })
 const contentOptions = computed<TemplateContentOptions>(() => ({
   showLabel: showCountdownLabel.value,
+  showImage: showCountdownImage.value,
   imageUrl: imageUrlError.value ? '' : countdownImageUrl.value.trim()
 }))
 const templateOptions = computed(() => variables.value.length
@@ -72,19 +74,36 @@ watch(open, (value) => {
   targetSize.value = document.value.activeSize
   generation.value = 0
   showCountdownLabel.value = true
+  showCountdownImage.value = true
   countdownImageUrl.value = ''
 })
 
 function previewStyle(template: WidgetTemplate, root: EditorDocument['layouts'][PreviewSize]): CSSProperties {
   const size = dimensions[template.size]
   const properties = root.properties as WidgetProperties
-  const scale = Math.min(220 / size.width, 126 / size.height)
+  const scale = Math.min(480 / size.width, 300 / size.height, 1.45)
   return {
     width: `${size.width}px`,
     height: `${size.height}px`,
     padding: `${properties.padding}px`,
-    backgroundColor: properties.backgroundColor,
     transform: `translate(-50%, -50%) scale(${scale})`
+  }
+}
+
+function previewBackgroundStyle(root: EditorDocument['layouts'][PreviewSize]): CSSProperties {
+  const properties = root.properties as WidgetProperties
+  const imageUrl = properties.backgroundImageMode === 'static'
+    ? properties.backgroundImageUrl
+    : properties.backgroundImageMode === 'variable'
+      ? String(resolveVariable(properties.backgroundImageVariable) || properties.backgroundImageFallbackUrl || '')
+      : ''
+  return {
+    backgroundColor: properties.backgroundColor,
+    backgroundImage: imageUrl ? `url(${JSON.stringify(imageUrl)})` : undefined,
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'cover',
+    opacity: properties.backgroundOpacity
   }
 }
 
@@ -107,22 +126,27 @@ function selectSize(size: PreviewSize) {
   generation.value = 0
 }
 
-function generateNewOptions() {
-  generation.value = (generation.value + 1) % optionSetCount
+function rollDesigns() {
+  generation.value = Date.now() + Math.floor(Math.random() * 100_000)
 }
 
 function applyAllSizes() {
-  if (!variables.value.length) return
+  if (!variables.value.length || !selectedPreview.value) return
   const replacing = hasExistingLayouts.value
   const previous = snapshotDocument()
-  const result = applyAdaptiveTemplateSet(document.value, generation.value, contentOptions.value)
+  const result = applyAdaptiveTemplateSet(
+    document.value,
+    generation.value,
+    contentOptions.value,
+    selectedPreview.value.template
+  )
   selectedElementId.value = result.layouts.medium.id
   open.value = false
   toast.add({
     title: replacing ? 'All size layouts replaced' : 'Three data-aware layouts created',
     description: isCountdown.value
-      ? 'Each size uses the day count, plus only the label and image you chose.'
-      : 'Each size uses a restrained number of values suited to its available space.',
+      ? `The ${TEMPLATE_DENSITY_LABELS[selectedPreview.value.template.density].toLowerCase()} countdown style now adapts across all three sizes.`
+      : `The same ${TEMPLATE_DENSITY_LABELS[selectedPreview.value.template.density].toLowerCase()} design system now adapts across all three sizes.`,
     color: 'success',
     icon: 'i-lucide-panels-top-left',
     actions: [undoAction(previous)]
@@ -154,129 +178,149 @@ function openJson() {
 <template>
   <UModal
     v-model:open="open"
-    title="Generate size layouts"
-    description="Create varied options from the meaning and shape of your JSON, then apply one layout or build all three sizes."
-    :ui="{ content: 'w-[calc(100vw-2rem)] max-w-5xl', body: 'p-0 sm:p-0' }"
+    title="Choose a layout"
+    :description="`Pick a starting point for the ${targetSize} widget. Your data is already connected.`"
+    :ui="{ content: 'w-[calc(100vw-2rem)] max-w-4xl', body: 'p-0 sm:p-0' }"
   >
     <template #body>
       <div v-if="variables.length">
-        <div class="flex flex-col gap-4 border-b border-muted bg-elevated px-5 py-4 sm:flex-row sm:items-center sm:px-6">
-          <div class="flex min-w-0 flex-1 items-start gap-3">
-            <span class="grid size-9 shrink-0 place-items-center rounded-md bg-primary text-inverted">
-              <UIcon name="i-lucide-panels-top-left" class="size-4.5" />
-            </span>
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <p class="text-sm font-semibold text-highlighted">Data-aware layout set</p>
-                <UBadge :label="TEMPLATE_DOMAIN_LABELS[domain]" color="neutral" variant="subtle" size="sm" />
-              </div>
-              <p class="mt-0.5 text-xs leading-5 text-muted">Each size gets its own hierarchy instead of stretching one composition.</p>
+        <div class="flex flex-col gap-3 border-b border-muted bg-elevated px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="flex items-center gap-1 rounded-md bg-muted p-0.5" aria-label="Widget size">
+              <UButton
+                v-for="size in sizes"
+                :key="size.value"
+                :icon="size.icon"
+                :label="size.label"
+                color="neutral"
+                :variant="targetSize === size.value ? 'solid' : 'ghost'"
+                size="sm"
+                @click="selectSize(size.value)"
+              />
             </div>
+            <UBadge :label="TEMPLATE_DOMAIN_LABELS[domain]" color="neutral" variant="subtle" size="sm" />
           </div>
           <UButton
-            icon="i-lucide-wand-sparkles"
-            :label="hasExistingLayouts ? 'Replace all sizes' : 'Build all sizes'"
+            icon="i-lucide-panels-top-left"
+            :label="hasExistingLayouts ? 'Redesign all sizes' : 'Create all sizes'"
+            color="neutral"
+            variant="outline"
+            size="sm"
             :disabled="Boolean(imageUrlError)"
             @click="applyAllSizes"
           />
         </div>
 
-        <div v-if="isCountdown" class="grid gap-4 border-b border-muted px-5 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(16rem,1.2fr)] sm:px-6">
+        <div v-if="isCountdown" class="space-y-3 border-b border-muted px-5 py-3 sm:px-6">
           <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-default">Event label</p>
-              <p class="mt-0.5 text-xs leading-5 text-muted">
-                {{ countdownLabel ? `Show ${countdownLabel.label} above the day count.` : 'No event label field was detected.' }}
-              </p>
-            </div>
+            <p class="text-sm font-medium text-default">Event label</p>
             <USwitch v-model="showCountdownLabel" :disabled="!countdownLabel" aria-label="Show event label" />
           </div>
 
-          <UFormField
-            label="Image URL"
-            hint="Optional"
-            :description="detectedImage ? `Leave blank to use ${detectedImage.label} from the JSON.` : 'Add a remote image to the generated countdown layouts.'"
-            :error="imageUrlError || undefined"
-          >
-            <UInput v-model="countdownImageUrl" type="url" icon="i-lucide-image" class="w-full" />
-          </UFormField>
-        </div>
-
-        <div class="flex flex-col gap-3 border-b border-muted px-5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div class="flex items-center gap-1 rounded-md bg-muted p-0.5">
-            <UButton
-              v-for="size in sizes"
-              :key="size.value"
-              :icon="size.icon"
-              :label="size.label"
-              color="neutral"
-              :variant="targetSize === size.value ? 'solid' : 'ghost'"
-              size="sm"
-              @click="selectSize(size.value)"
+          <div class="grid gap-2">
+            <div class="flex items-center justify-between gap-4">
+              <p class="text-sm font-medium text-default">Use image</p>
+              <USwitch v-model="showCountdownImage" aria-label="Use image" />
+            </div>
+            <UInput
+              v-model="countdownImageUrl"
+              type="url"
+              icon="i-lucide-image"
+              placeholder="Image URL"
+              aria-label="Image URL"
+              class="w-full"
+              :disabled="!showCountdownImage"
             />
           </div>
-
-          <div class="flex items-center justify-between gap-3 sm:justify-end">
-            <p class="text-xs text-muted">Option set {{ generation + 1 }} of {{ optionSetCount }}</p>
-            <UButton
-              icon="i-lucide-refresh-cw"
-              label="Show more options"
-              color="neutral"
-              variant="outline"
-              size="sm"
-              @click="generateNewOptions"
-            />
-          </div>
+          <p v-if="imageUrlError" class="text-xs text-error">{{ imageUrlError }}</p>
         </div>
 
-        <div class="border-b border-muted px-5 py-3 sm:px-6">
-          <p class="text-xs text-muted">
-            <span class="font-medium text-default">{{ variables.length }} JSON {{ variables.length === 1 ? 'field' : 'fields' }} available.</span>
-            {{ isCountdown
-              ? 'These options use the day count, with only the optional label and image above.'
-              : `Choose an option for the ${targetSize} widget or show another set.` }}
-          </p>
-        </div>
-
-        <div class="studio-scrollbar max-h-[55vh] overflow-y-auto p-4 sm:p-5">
-          <div class="grid gap-px overflow-hidden rounded-lg border border-muted bg-muted sm:grid-cols-2 lg:grid-cols-4">
-            <button
-              v-for="item in previews"
-              :key="item.template.id"
-              type="button"
-              class="relative min-w-0 bg-default text-left outline-none transition-colors hover:bg-elevated focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary"
-              :class="selectedTemplateId === item.template.id ? 'bg-accented' : ''"
-              :aria-pressed="selectedTemplateId === item.template.id"
-              @click="selectedTemplateId = item.template.id"
-            >
-              <div class="studio-grid relative h-40 overflow-hidden border-b border-muted">
-                <div
-                  class="pointer-events-none absolute left-1/2 top-1/2 overflow-hidden rounded-[22px] shadow-[0_16px_42px_rgba(15,23,42,0.22)]"
-                  :style="previewStyle(item.template, item.built.root)"
-                >
-                  <div class="flex size-full min-h-0 min-w-0 flex-col">
-                    <EditorPreviewNode v-for="child in item.built.root.children" :key="child.id" :element="child" direction="vertical" />
-                  </div>
+        <div class="grid h-[min(68vh,42rem)] min-h-0 grid-rows-[auto_minmax(10rem,1fr)] overflow-hidden lg:h-[min(62vh,30rem)] lg:grid-cols-[minmax(0,1.45fr)_minmax(17rem,0.75fr)] lg:grid-rows-1">
+          <div class="min-w-0 p-4 sm:p-6">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="truncate text-sm font-semibold text-highlighted">{{ selectedPreview?.template.name }}</p>
+                  <UBadge v-if="selectedPreview" :label="selectedPreview.template.layout" color="neutral" variant="subtle" size="sm" />
+                  <UBadge
+                    v-if="selectedPreview"
+                    :label="TEMPLATE_DENSITY_LABELS[selectedPreview.template.density]"
+                    :color="selectedPreview.template.density === 'dense' ? 'primary' : 'neutral'"
+                    variant="soft"
+                    size="sm"
+                  />
                 </div>
-                <span v-if="selectedTemplateId === item.template.id" class="absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-primary text-inverted shadow-sm">
-                  <UIcon name="i-lucide-check" class="size-3.5" />
-                </span>
               </div>
+              <UBadge v-if="selectedTemplateId === templateOptions[0]?.id" label="Recommended" color="primary" variant="soft" size="sm" />
+            </div>
 
-              <div class="flex items-start gap-3 p-4">
-                <span class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-elevated" :style="{ color: item.template.accent }">
+            <div class="studio-grid relative h-44 overflow-hidden rounded-lg border border-muted sm:h-64 lg:h-[20rem]">
+              <div
+                v-if="selectedPreview"
+                class="pointer-events-none absolute left-1/2 top-1/2 overflow-hidden rounded-[22px] shadow-[0_24px_64px_rgba(15,23,42,0.3)]"
+                :style="previewStyle(selectedPreview.template, selectedPreview.built.root)"
+              >
+                <div class="pointer-events-none absolute inset-0" :style="previewBackgroundStyle(selectedPreview.built.root)" aria-hidden="true" />
+                <div class="relative z-10 flex size-full min-h-0 min-w-0 flex-col">
+                  <EditorPreviewNode v-for="child in selectedPreview.built.root.children" :key="child.id" :element="child" direction="vertical" />
+                </div>
+              </div>
+            </div>
+
+            <p v-if="selectedPreview" class="mt-3 text-xs text-muted">
+              Data: {{ selectedPreview.built.usedPaths.map(path => variableLabels.get(path) || path).join(' · ') }}
+            </p>
+          </div>
+
+          <div class="flex min-h-0 flex-col border-t border-muted bg-elevated/40 p-3 lg:border-l lg:border-t-0">
+            <div class="flex shrink-0 items-center justify-between gap-3 px-2 pb-2 pt-1">
+              <div>
+                <p class="text-sm font-semibold text-highlighted">{{ previews.length }} design options</p>
+                <p class="mt-0.5 text-xs text-muted">Each roll creates four new directions.</p>
+              </div>
+              <UButton
+                icon="i-lucide-dices"
+                :label="`Roll ${previews.length} new designs`"
+                color="neutral"
+                variant="outline"
+                size="xs"
+                @click="rollDesigns"
+              />
+            </div>
+
+            <div class="studio-scrollbar mt-1 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]" role="listbox" :aria-label="`${targetSize} layout styles`">
+              <button
+                v-for="item in previews"
+                :key="item.template.id"
+                type="button"
+                role="option"
+                class="group flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left outline-none transition-colors hover:bg-elevated focus-visible:ring-2 focus-visible:ring-primary"
+                :class="selectedTemplateId === item.template.id ? 'border-primary bg-primary/10' : 'border-transparent'"
+                :aria-selected="selectedTemplateId === item.template.id"
+                @click="selectedTemplateId = item.template.id"
+              >
+                <span class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-default shadow-sm" :style="{ color: item.template.accent }">
                   <UIcon :name="item.template.icon" class="size-4" />
                 </span>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="font-semibold text-highlighted">{{ item.template.name }}</p>
-                    <UBadge :label="item.template.layout" color="neutral" variant="subtle" size="sm" />
-                  </div>
-                  <p class="mt-1 text-xs leading-5 text-muted">{{ item.template.description }}</p>
-                  <p class="mt-2 truncate text-[11px] text-toned">{{ item.built.usedPaths.map(path => variableLabels.get(path) || path).join(' · ') }}</p>
-                </div>
-              </div>
-            </button>
+                <span class="min-w-0 flex-1">
+                  <span class="flex items-center gap-2">
+                    <span class="text-sm font-semibold text-highlighted">{{ item.template.name }}</span>
+                  </span>
+                  <span class="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-toned">
+                    <span>{{ TEMPLATE_DENSITY_LABELS[item.template.density] }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ isCountdown ? (item.template.countdownTreatment === 'single-line' ? 'One-line timer' : 'Hero timer') : `${item.built.usedPaths.length} ${item.built.usedPaths.length === 1 ? 'value' : 'values'}` }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ isCountdown && detectedImage && item.template.imageTreatment === 'background' ? 'Image bg' : `${Math.round(item.template.backgroundOpacity * 100)}% bg` }}</span>
+                  </span>
+                </span>
+                <UIcon
+                  :name="selectedTemplateId === item.template.id ? 'i-lucide-circle-check' : 'i-lucide-chevron-right'"
+                  class="mt-1 size-4 shrink-0"
+                  :class="selectedTemplateId === item.template.id ? 'text-primary' : 'text-dimmed group-hover:text-default'"
+                />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -298,9 +342,7 @@ function openJson() {
         <UButton label="Cancel" color="neutral" variant="outline" @click="close" />
         <UButton
           v-if="selectedPreview"
-          :label="`Use ${selectedPreview.template.name} for ${selectedPreview.template.size}`"
-          color="neutral"
-          variant="solid"
+          :label="`Use this ${selectedPreview.template.size} layout`"
           :disabled="Boolean(imageUrlError)"
           @click="applySelectedSize"
         />

@@ -88,8 +88,9 @@ const textStyle = computed<CSSProperties>(() => {
     display: '-webkit-box',
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden',
-    lineHeight: 1.15,
-    maxWidth: '100%'
+    lineHeight: 1.2,
+    maxWidth: '100%',
+    flexShrink: 0
   }
 })
 
@@ -163,11 +164,12 @@ const dateStyle = computed<CSSProperties>(() => {
     color: value.color,
     fontSize: `${value.fontSize}px`,
     fontWeight: weightMap[value.weight],
-    fontFamily: value.font === 'monospaced' ? 'var(--font-mono)' : value.font === 'serif' ? 'Georgia, serif' : 'var(--font-sans)'
+    fontFamily: value.font === 'monospaced' ? 'var(--font-mono)' : value.font === 'serif' ? 'Georgia, serif' : 'var(--font-sans)',
+    flexShrink: 0
   }
 })
 
-function select(event: MouseEvent) {
+function select(event: Event) {
   event.stopPropagation()
   selectElement(props.element.id)
 }
@@ -235,7 +237,12 @@ function setStackElement(value: Element | ComponentPublicInstance | null, instan
     data-canvas-sortable-item
     data-canvas-drag-handle
     :data-canvas-element-id="element.id"
+    role="button"
+    tabindex="0"
+    :aria-label="`Edit ${element.name}`"
     @click="select"
+    @keydown.enter.prevent="select"
+    @keydown.space.prevent="select"
   >{{ textContent }}</span>
 
   <span
@@ -246,8 +253,12 @@ function setStackElement(value: Element | ComponentPublicInstance | null, instan
     data-canvas-sortable-item
     data-canvas-drag-handle
     :data-canvas-element-id="element.id"
-    :aria-label="(element.properties as SpacerProperties).mode === 'flexible' ? 'Flexible spacer' : `${(element.properties as SpacerProperties).size} point spacer`"
+    role="button"
+    tabindex="0"
+    :aria-label="`Edit ${(element.properties as SpacerProperties).mode === 'flexible' ? 'flexible spacer' : `${(element.properties as SpacerProperties).size} point spacer`}`"
     @click="select"
+    @keydown.enter.prevent="select"
+    @keydown.space.prevent="select"
   />
 
   <img
@@ -260,7 +271,12 @@ function setStackElement(value: Element | ComponentPublicInstance | null, instan
     data-canvas-sortable-item
     data-canvas-drag-handle
     :data-canvas-element-id="element.id"
+    role="button"
+    tabindex="0"
+    :aria-label="`Edit ${element.name}`"
     @click="select"
+    @keydown.enter.prevent="select"
+    @keydown.space.prevent="select"
   >
 
   <span
@@ -271,7 +287,12 @@ function setStackElement(value: Element | ComponentPublicInstance | null, instan
     data-canvas-sortable-item
     data-canvas-drag-handle
     :data-canvas-element-id="element.id"
+    role="button"
+    tabindex="0"
+    :aria-label="`Edit ${element.name}`"
     @click="select"
+    @keydown.enter.prevent="select"
+    @keydown.space.prevent="select"
   >
     <UIcon :name="symbolIcon" class="size-full" />
   </span>
@@ -283,6 +304,11 @@ function setStackElement(value: Element | ComponentPublicInstance | null, instan
     data-canvas-sortable-item
     data-canvas-drag-handle
     :data-canvas-element-id="element.id"
+    role="button"
+    tabindex="0"
+    :aria-label="`Edit ${element.name}`"
     @click="select"
+    @keydown.enter.prevent="select"
+    @keydown.space.prevent="select"
   >{{ dateText }}</time>
 </template>

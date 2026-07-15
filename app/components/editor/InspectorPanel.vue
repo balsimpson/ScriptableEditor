@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { WidgetProperties } from '~/types/editor'
-import { ELEMENT_ICONS, ELEMENT_LABELS } from '~/utils/editor'
+import { ELEMENT_ICONS, ELEMENT_LABELS, getValueAtPath } from '~/utils/editor'
+import { SF_SYMBOL_NAMES } from '~/utils/sf-symbols'
 
 withDefaults(defineProps<{
   showHeader?: boolean
@@ -8,8 +9,29 @@ withDefaults(defineProps<{
   showHeader: true
 })
 
-const { document, activeSize, selectedElement, variableOptions } = useWidgetEditor()
+const { document, activeSize, selectedElement, variableOptions, previewData } = useWidgetEditor()
 const properties = computed<any>(() => selectedElement.value.properties)
+const variableValueKind = computed<'number' | 'date' | 'text' | 'unknown'>(() => {
+  if (selectedElement.value.type !== 'text' || properties.value.contentMode !== 'variable') return 'unknown'
+  const value = getValueAtPath(previewData.value, properties.value.variable)
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'string') {
+    const looksLikeDate = /^\d{4}-\d{2}-\d{2}(?:[T\s]|$)/.test(value)
+    if (looksLikeDate && !Number.isNaN(new Date(value).getTime())) return 'date'
+    return 'text'
+  }
+  if (typeof value === 'boolean') return 'text'
+  return 'unknown'
+})
+const formattingKindLabel = computed(() => ({
+  number: 'Number options',
+  date: 'Date options',
+  text: 'Text options',
+  unknown: 'Formatting options'
+}[variableValueKind.value]))
+const showNumberFormatting = computed(() => variableValueKind.value === 'number' || variableValueKind.value === 'unknown')
+const showDateFormatting = computed(() => variableValueKind.value === 'date' || variableValueKind.value === 'unknown')
+const showTextFormatting = computed(() => variableValueKind.value === 'text' || variableValueKind.value === 'unknown')
 
 function sharedWidgetProperty<K extends 'refreshInterval' | 'tapUrl'>(key: K) {
   return computed<WidgetProperties[K]>({
@@ -57,6 +79,17 @@ const backgroundImageModeItems = [
   { label: 'Static URL', value: 'static' },
   { label: 'Bound field', value: 'variable' }
 ]
+const imageContentModeItems = [
+  { label: 'Fit', value: 'fit' },
+  { label: 'Fill', value: 'fill' }
+]
+
+const backgroundOpacityPercent = computed({
+  get: () => Math.round((properties.value.backgroundOpacity ?? 1) * 100),
+  set: (value: number) => {
+    properties.value.backgroundOpacity = Math.max(0, Math.min(100, value)) / 100
+  }
+})
 
 function updateRepeat(enabled: boolean) {
   properties.value.repeatCount = enabled ? Math.max(3, properties.value.repeatCount || 1) : 1
@@ -99,6 +132,22 @@ function updateRepeat(enabled: boolean) {
         <UFormField label="Background color">
           <EditorColorField v-model="properties.backgroundColor" />
         </UFormField>
+        <UFormField label="Background opacity" description="Applies to the color and image. Set to 0% for a clear background.">
+          <div class="flex items-center gap-3">
+            <USlider v-model="backgroundOpacityPercent" :min="0" :max="100" :step="1" class="min-w-0 flex-1" />
+            <div class="flex shrink-0 items-center gap-1.5">
+              <UInputNumber
+                v-model="backgroundOpacityPercent"
+                :min="0"
+                :max="100"
+                :step="1"
+                class="w-28"
+                :ui="{ base: 'tabular-nums' }"
+              />
+              <span class="text-xs text-muted">%</span>
+            </div>
+          </div>
+        </UFormField>
         <div class="space-y-4 border-t border-muted pt-5">
           <p class="studio-panel-label text-muted">Background image</p>
           <UFormField label="Image source">
@@ -108,7 +157,7 @@ function updateRepeat(enabled: boolean) {
             <UInput v-model="properties.backgroundImageUrl" type="url" class="w-full" />
           </UFormField>
           <template v-else-if="properties.backgroundImageMode === 'variable'">
-            <UFormField label="Field path" description="Type any path, even before connecting a data source.">
+            <UFormField label="Data field" description="Enter a field now, even if the data source will be connected later.">
               <UInput v-model="properties.backgroundImageVariable" list="widget-variable-paths" class="w-full font-mono" />
             </UFormField>
             <UFormField label="Fallback image URL">
@@ -170,7 +219,7 @@ function updateRepeat(enabled: boolean) {
               <p class="studio-panel-label text-muted">Repeat group</p>
               <p class="mt-1 text-xs leading-5 text-muted">Design one group and repeat it along its parent row or column.</p>
             </div>
-            <USwitch :model-value="(properties.repeatCount || 1) > 1" @update:model-value="updateRepeat" />
+            <USwitch :model-value="(properties.repeatCount || 1) > 1" aria-label="Repeat this group" @update:model-value="updateRepeat" />
           </div>
           <template v-if="(properties.repeatCount || 1) > 1">
             <UFormField label="Instances" description="Use 3 for a compact strip or 7 for a full forecast.">
@@ -204,7 +253,7 @@ function updateRepeat(enabled: boolean) {
                 @click="() => { properties.contentMode = 'static' }"
               />
               <UButton
-                label="Bound variable"
+                label="Data field"
                 color="neutral"
                 :variant="properties.contentMode === 'variable' ? 'solid' : 'ghost'"
                 block
@@ -216,7 +265,7 @@ function updateRepeat(enabled: boolean) {
             <UTextarea v-model="properties.content" autoresize :maxrows="5" class="w-full" />
           </UFormField>
           <template v-else>
-            <UFormField label="Field path" description="Choose a discovered field or type the field your future data will provide.">
+            <UFormField label="Data field" description="Choose a field from the sample data or enter one that will be available later.">
               <UInput v-model="properties.variable" list="widget-variable-paths" class="w-full font-mono" />
             </UFormField>
             <UAlert
@@ -246,56 +295,81 @@ function updateRepeat(enabled: boolean) {
           <UFormField label="Color">
             <EditorColorField v-model="properties.color" />
           </UFormField>
-          <div class="grid grid-cols-2 gap-3">
-            <UFormField label="Opacity">
-              <UInputNumber v-model="properties.opacity" :min="0" :max="1" :step="0.05" class="w-full" />
-            </UFormField>
-            <UFormField label="Line limit">
-              <UInputNumber v-model="properties.lineLimit" :min="1" :max="20" class="w-full" />
-            </UFormField>
-          </div>
         </div>
 
-        <div v-if="properties.contentMode === 'variable'" class="space-y-4 border-t border-muted pt-5">
-          <p class="studio-panel-label text-muted">Formatting</p>
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="text-sm text-default">Round number</p>
-              <p class="text-xs text-muted">Use the nearest whole number.</p>
+        <UCollapsible class="border-t border-muted">
+          <template #default="{ open }">
+            <UButton
+              label="Advanced"
+              icon="i-lucide-sliders-horizontal"
+              :trailing-icon="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+              color="neutral"
+              variant="ghost"
+              block
+              class="justify-between rounded-none px-0 pt-5"
+            />
+          </template>
+          <template #content>
+            <div class="space-y-4 pt-4">
+              <div class="grid grid-cols-2 gap-3">
+                <UFormField label="Opacity">
+                  <UInputNumber v-model="properties.opacity" :min="0" :max="1" :step="0.05" class="w-full" />
+                </UFormField>
+                <UFormField label="Line limit">
+                  <UInputNumber v-model="properties.lineLimit" :min="1" :max="20" class="w-full" />
+                </UFormField>
+              </div>
+
+              <template v-if="properties.contentMode === 'variable'">
+                <div class="flex items-center justify-between border-t border-muted pt-4">
+                  <p class="studio-panel-label text-muted">{{ formattingKindLabel }}</p>
+                  <UBadge v-if="variableValueKind !== 'unknown'" :label="variableValueKind" color="neutral" variant="subtle" size="sm" />
+                </div>
+
+                <template v-if="showNumberFormatting">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-sm text-default">Round number</p>
+                      <p class="text-xs text-muted">Use the nearest whole number.</p>
+                    </div>
+                    <USwitch v-model="properties.format.round" aria-label="Round number" />
+                  </div>
+                  <UFormField label="Decimal places">
+                    <UInputNumber v-model="properties.format.decimals" :min="0" :max="8" class="w-full" />
+                  </UFormField>
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-sm text-default">Percentage</p>
+                      <p class="text-xs text-muted">Multiply by 100 and add %.</p>
+                    </div>
+                    <USwitch v-model="properties.format.percentage" aria-label="Format as percentage" />
+                  </div>
+                  <UFormField label="Currency symbol">
+                    <UInput v-model="properties.format.currency" class="w-full" />
+                  </UFormField>
+                </template>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <UFormField label="Prefix">
+                    <UInput v-model="properties.format.prefix" class="w-full" />
+                  </UFormField>
+                  <UFormField label="Suffix">
+                    <UInput v-model="properties.format.suffix" class="w-full" />
+                  </UFormField>
+                </div>
+                <UFormField v-if="showTextFormatting" label="Letter case">
+                  <USelect v-model="properties.format.textCase" :items="textCaseItems" class="w-full" />
+                </UFormField>
+                <UFormField v-if="showDateFormatting" label="Date format">
+                  <UInput v-model="properties.format.dateFormat" class="w-full font-mono" />
+                </UFormField>
+                <UFormField label="Fallback value">
+                  <UInput v-model="properties.format.fallback" class="w-full" />
+                </UFormField>
+              </template>
             </div>
-            <USwitch v-model="properties.format.round" />
-          </div>
-          <UFormField label="Decimal places">
-            <UInputNumber v-model="properties.format.decimals" :min="0" :max="8" class="w-full" />
-          </UFormField>
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="text-sm text-default">Percentage</p>
-              <p class="text-xs text-muted">Multiply by 100 and add %.</p>
-            </div>
-            <USwitch v-model="properties.format.percentage" />
-          </div>
-          <div class="grid grid-cols-3 gap-2">
-            <UFormField label="Currency">
-              <UInput v-model="properties.format.currency" class="w-full" />
-            </UFormField>
-            <UFormField label="Prefix">
-              <UInput v-model="properties.format.prefix" class="w-full" />
-            </UFormField>
-            <UFormField label="Suffix">
-              <UInput v-model="properties.format.suffix" class="w-full" />
-            </UFormField>
-          </div>
-          <UFormField label="Letter case">
-            <USelect v-model="properties.format.textCase" :items="textCaseItems" class="w-full" />
-          </UFormField>
-          <UFormField label="Date format">
-            <UInput v-model="properties.format.dateFormat" class="w-full font-mono" />
-          </UFormField>
-          <UFormField label="Fallback value">
-            <UInput v-model="properties.format.fallback" class="w-full" />
-          </UFormField>
-        </div>
+          </template>
+        </UCollapsible>
       </template>
 
       <template v-else-if="selectedElement.type === 'image'">
@@ -305,21 +379,34 @@ function updateRepeat(enabled: boolean) {
             <UButton label="Remote URL" color="neutral" :variant="properties.sourceType === 'remote' ? 'solid' : 'ghost'" block @click="() => { properties.sourceType = 'remote' }" />
           </div>
         </UFormField>
-        <UFormField v-if="properties.sourceType === 'symbol'" label="SF Symbol name">
-          <UInput v-model="properties.systemSymbol" class="w-full font-mono" />
+        <UFormField
+          v-if="properties.sourceType === 'symbol'"
+          label="SF Symbol name"
+          description="Search common symbols or enter any valid SF Symbol name."
+        >
+          <UInputMenu
+            v-model="properties.systemSymbol"
+            :items="SF_SYMBOL_NAMES"
+            mode="autocomplete"
+            placeholder="Search or enter a symbol name"
+            open-on-focus
+            :virtualize="{ estimateSize: 32 }"
+            class="w-full"
+            :ui="{ base: 'font-mono', itemLabel: 'font-mono' }"
+          />
         </UFormField>
         <template v-else>
           <UFormField label="Remote image value">
             <div class="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
               <UButton label="Static URL" color="neutral" :variant="properties.remoteMode === 'static' ? 'solid' : 'ghost'" block @click="() => { properties.remoteMode = 'static' }" />
-              <UButton label="Bound variable" color="neutral" :variant="properties.remoteMode === 'variable' ? 'solid' : 'ghost'" block @click="() => { properties.remoteMode = 'variable' }" />
+              <UButton label="Data field" color="neutral" :variant="properties.remoteMode === 'variable' ? 'solid' : 'ghost'" block @click="() => { properties.remoteMode = 'variable' }" />
             </div>
           </UFormField>
           <UFormField v-if="properties.remoteMode === 'static'" label="Remote image URL">
             <UInput v-model="properties.remoteUrl" type="url" class="w-full" />
           </UFormField>
           <template v-else>
-            <UFormField label="Field path" description="Type any path, including {index} inside a repeated group.">
+            <UFormField label="Data field" description="Choose a field or enter one that uses {index} inside a repeated group.">
               <UInput v-model="properties.variable" list="widget-variable-paths" class="w-full font-mono" />
             </UFormField>
             <UFormField label="Fallback URL">
@@ -335,9 +422,17 @@ function updateRepeat(enabled: boolean) {
             <UInputNumber v-model="properties.height" :min="1" :max="500" class="w-full" />
           </UFormField>
         </div>
-        <UFormField label="Tint">
+        <UFormField v-if="properties.sourceType === 'symbol'" label="Tint">
           <EditorColorField v-model="properties.tintColor" />
         </UFormField>
+        <div class="grid grid-cols-2 gap-3">
+          <UFormField label="Content mode">
+            <USelect v-model="properties.contentMode" :items="imageContentModeItems" class="w-full" />
+          </UFormField>
+          <UFormField label="Opacity">
+            <UInputNumber v-model="properties.opacity" :min="0" :max="1" :step="0.05" class="w-full" />
+          </UFormField>
+        </div>
         <UFormField label="Corner radius">
           <UInputNumber v-model="properties.cornerRadius" :min="0" :max="100" class="w-full" />
         </UFormField>
@@ -347,11 +442,11 @@ function updateRepeat(enabled: boolean) {
         <UFormField label="Date value">
           <div class="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
             <UButton label="Current date" color="neutral" :variant="properties.sourceType === 'now' ? 'solid' : 'ghost'" block @click="() => { properties.sourceType = 'now' }" />
-            <UButton label="Bound variable" color="neutral" :variant="properties.sourceType === 'variable' ? 'solid' : 'ghost'" block @click="() => { properties.sourceType = 'variable' }" />
+            <UButton label="Data field" color="neutral" :variant="properties.sourceType === 'variable' ? 'solid' : 'ghost'" block @click="() => { properties.sourceType = 'variable' }" />
           </div>
         </UFormField>
         <template v-if="properties.sourceType === 'variable'">
-          <UFormField label="Field path" description="Type any path, including {index} inside a repeated group.">
+          <UFormField label="Data field" description="Choose a field or enter one that uses {index} inside a repeated group.">
             <UInput v-model="properties.variable" list="widget-variable-paths" class="w-full font-mono" />
           </UFormField>
           <UFormField label="Fallback value">
@@ -366,7 +461,7 @@ function updateRepeat(enabled: boolean) {
             <p class="text-sm text-default">Relative date</p>
             <p class="text-xs text-muted">Show time relative to now.</p>
           </div>
-          <USwitch v-model="properties.relativeDate" />
+          <USwitch v-model="properties.relativeDate" aria-label="Show relative date" />
         </div>
         <UFormField label="Font">
           <USelect v-model="properties.font" :items="fontItems" class="w-full" />

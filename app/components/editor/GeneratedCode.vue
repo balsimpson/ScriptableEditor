@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { getBindingIssues } from '~/utils/bindings'
+import type { ScriptableExportIssue } from '~/utils/scriptable'
 import { getUsedVariablePaths } from '~/utils/bindings'
 import { DATA_SOURCE_LABELS } from '~/utils/data'
-import { generateScriptableCode } from '~/utils/scriptable'
+import { generateScriptableCode, getScriptableExportIssues } from '~/utils/scriptable'
 
 const open = defineModel<boolean>('open', { default: false })
-const emit = defineEmits<{ selectIssue: [] }>()
+const emit = defineEmits<{ selectIssue: [issue: ScriptableExportIssue] }>()
 const { document } = useWidgetEditor()
 const { currentProject } = useProjectStore()
 const toast = useToast()
 const setupOpen = ref(false)
 const manualCopyOpen = ref(false)
 const manualCopyInput = ref<HTMLTextAreaElement | null>(null)
-const code = computed(() => generateScriptableCode(document.value))
+const code = computed(() => generateScriptableCode(document.value, {
+  projectId: currentProject.value.id,
+  projectName: currentProject.value.name
+}))
 const lineCount = computed(() => code.value.split('\n').length)
-const bindingIssues = computed(() => getBindingIssues(document.value))
+const exportIssues = computed(() => getScriptableExportIssues(document.value))
+const blockingIssues = computed(() => exportIssues.value.filter(issue => issue.severity === 'error'))
+const warningIssues = computed(() => exportIssues.value.filter(issue => issue.severity === 'warning'))
+const primaryIssue = computed(() => blockingIssues.value[0] ?? warningIssues.value[0])
 const usedVariablePaths = computed(() => getUsedVariablePaths(document.value))
 const enabledSizes = computed(() => Object.entries(document.value.enabledSizes)
   .filter(([, enabled]) => enabled)
@@ -28,6 +34,10 @@ const runtimeLabel = computed(() => {
 })
 
 async function copyCode() {
+  if (blockingIssues.value.length) {
+    toast.add({ title: 'Export needs attention', description: primaryIssue.value?.fix, color: 'error', icon: 'i-lucide-circle-x' })
+    return
+  }
   let copied = false
 
   try {
@@ -56,6 +66,10 @@ async function copyCode() {
 }
 
 function downloadCode() {
+  if (blockingIssues.value.length) {
+    toast.add({ title: 'Export needs attention', description: primaryIssue.value?.fix, color: 'error', icon: 'i-lucide-circle-x' })
+    return
+  }
   const blob = new Blob([code.value], { type: 'text/javascript;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = window.document.createElement('a')
@@ -78,8 +92,12 @@ function closeManualCopy() {
   manualCopyOpen.value = false
 }
 
-function selectIssue() {
-  emit('selectIssue')
+function selectIssue(issue: ScriptableExportIssue) {
+  emit('selectIssue', issue)
+}
+
+function selectPrimaryIssue() {
+  if (primaryIssue.value) selectIssue(primaryIssue.value)
 }
 </script>
 
@@ -108,13 +126,22 @@ function selectIssue() {
 
       <div class="space-y-4 p-5 sm:p-6">
         <UAlert
-          v-if="bindingIssues.length"
+          v-if="blockingIssues.length"
+          color="error"
+          variant="soft"
+          icon="i-lucide-circle-x"
+          :title="`${blockingIssues.length} ${blockingIssues.length === 1 ? 'problem prevents' : 'problems prevent'} a safe export`"
+          :description="`${primaryIssue?.code}: ${primaryIssue?.description} ${primaryIssue?.fix}`"
+          :actions="primaryIssue?.elementId ? [{ label: 'View setting', color: 'error', variant: 'outline', onClick: selectPrimaryIssue }] : undefined"
+        />
+        <UAlert
+          v-else-if="warningIssues.length"
           color="warning"
           variant="soft"
           icon="i-lucide-triangle-alert"
-          :title="`${bindingIssues.length} ${bindingIssues.length === 1 ? 'binding needs' : 'bindings need'} attention`"
-          :description="`${bindingIssues[0]?.elementName} references ${bindingIssues[0]?.variable}, which is missing from the current data sample.`"
-          :actions="[{ label: 'View layer', color: 'warning', variant: 'outline', onClick: selectIssue }]"
+          :title="`Ready with ${warningIssues.length} ${warningIssues.length === 1 ? 'warning' : 'warnings'}`"
+          :description="`${primaryIssue?.code}: ${primaryIssue?.description} ${primaryIssue?.fix}`"
+          :actions="primaryIssue?.elementId ? [{ label: 'View setting', color: 'warning', variant: 'outline', onClick: selectPrimaryIssue }] : undefined"
         />
         <UAlert
           v-else-if="usedVariablePaths.length"
@@ -132,6 +159,18 @@ function selectIssue() {
           title="Visual widget ready"
           description="This layout has no bound fields. The exported script still includes a data adapter for later."
         />
+
+        <div v-if="exportIssues.length" class="divide-y divide-muted border-y border-muted">
+          <div v-for="issue in exportIssues" :key="`${issue.code}-${issue.location || issue.title}`" class="flex items-start gap-3 py-3">
+            <UIcon :name="issue.severity === 'error' ? 'i-lucide-circle-x' : 'i-lucide-triangle-alert'" :class="issue.severity === 'error' ? 'mt-0.5 size-4 shrink-0 text-error' : 'mt-0.5 size-4 shrink-0 text-warning'" />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-highlighted">{{ issue.code }} · {{ issue.title }}</p>
+              <p class="mt-1 text-xs leading-5 text-muted">{{ issue.description }}</p>
+              <p class="mt-1 text-xs leading-5 text-muted"><span class="font-medium text-default">Fix:</span> {{ issue.fix }}</p>
+            </div>
+            <UButton v-if="issue.elementId" label="Open" color="neutral" variant="ghost" size="xs" @click="selectIssue(issue)" />
+          </div>
+        </div>
 
         <UCollapsible class="border-y border-muted">
           <template #default="{ open: codeOpen }">
@@ -153,10 +192,10 @@ function selectIssue() {
     </template>
 
     <template #footer>
-      <UButton label="Install on iPhone" icon="i-lucide-route" color="neutral" variant="soft" class="col-span-2 sm:col-span-1" @click="openSetup" />
+      <UButton label="Installation steps" icon="i-lucide-route" color="neutral" variant="soft" class="col-span-2 sm:col-span-1" @click="openSetup" />
       <div class="hidden min-w-4 flex-1 sm:block" />
-      <UButton label="Download" icon="i-lucide-download" color="neutral" variant="outline" @click="downloadCode" />
-      <UButton label="Copy script" icon="i-lucide-copy" @click="copyCode" />
+      <UButton label="Download" icon="i-lucide-download" color="neutral" variant="outline" :disabled="blockingIssues.length > 0" @click="downloadCode" />
+      <UButton label="Copy script" icon="i-lucide-copy" :disabled="blockingIssues.length > 0" @click="copyCode" />
     </template>
   </USlideover>
 
@@ -181,7 +220,7 @@ function selectIssue() {
         </li>
         <li class="flex gap-3">
           <span class="font-mono text-xs text-primary">{{ document.data.source.kind === 'snapshot' ? '02' : '03' }}</span>
-          <p><strong class="font-medium text-highlighted">Add a Scriptable widget.</strong> Select this script in the widget settings. Each included widget size uses its matching generated layout.</p>
+          <p><strong class="font-medium text-highlighted">Add a Scriptable Home Screen widget.</strong> Select this script in the widget settings. Small, Medium, and Large use their matching generated layouts; Lock Screen accessory families are not included.</p>
         </li>
       </ol>
     </template>

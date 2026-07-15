@@ -58,6 +58,7 @@ export function createElement(type: ElementType): WidgetElement {
         ...common,
         properties: {
           backgroundColor: '#172033',
+          backgroundOpacity: 1,
           backgroundImageMode: 'none',
           backgroundImageUrl: '',
           backgroundImageVariable: '',
@@ -250,6 +251,10 @@ export function migrateEditorDocument(value: unknown): EditorDocument | undefine
 function normalizeVisualProperties(element: WidgetElement) {
   if (element.type === 'widget') {
     const properties = element.properties as WidgetProperties
+    const backgroundOpacity = Number(properties.backgroundOpacity)
+    properties.backgroundOpacity = Number.isFinite(backgroundOpacity)
+      ? Math.max(0, Math.min(1, backgroundOpacity))
+      : 1
     properties.backgroundImageMode = properties.backgroundImageMode === 'static' || properties.backgroundImageMode === 'variable'
       ? properties.backgroundImageMode
       : 'none'

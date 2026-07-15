@@ -28,14 +28,15 @@ function continueEmptyLayout() {
       <div class="flex items-center gap-1">
         <UButton
           icon="i-lucide-layout-template"
-          :label="activeRoot.children.length ? 'Change layout' : 'Generate layout'"
+          :label="activeRoot.children.length ? 'Choose layout' : 'Create layout'"
           color="neutral"
           variant="ghost"
           size="xs"
+          class="min-h-11 lg:min-h-0"
           @click="openTemplatePicker"
         />
         <UDropdownMenu :items="addItems" :content="{ align: 'end' }">
-          <UButton icon="i-lucide-plus" label="Add" color="neutral" variant="ghost" size="xs" />
+          <UButton icon="i-lucide-plus" label="Add" color="neutral" variant="ghost" size="xs" class="min-h-11 lg:min-h-0" />
         </UDropdownMenu>
       </div>
     </div>
@@ -49,14 +50,14 @@ function continueEmptyLayout() {
       <EditorTreeNode :element="activeRoot" />
       <div v-if="activeRoot.children.length === 0" class="px-3 py-8 text-center">
         <UIcon :name="hasData ? 'i-lucide-layout-template' : 'i-lucide-type'" class="mx-auto mb-2 size-5 text-dimmed" />
-        <p class="text-sm font-medium text-default">{{ hasData ? 'Generate a layout for these values' : 'Start with something visible' }}</p>
+        <p class="text-sm font-medium text-default">{{ hasData ? 'Choose a layout for these values' : 'Start with something visible' }}</p>
         <p class="mx-auto mt-1 max-w-52 text-xs leading-5 text-muted">
-          {{ hasData ? 'Compare varied options for this size or build all three sizes together.' : 'Add editable text now. Data can be connected later.' }}
+          {{ hasData ? 'Preview one clear recommendation, then switch styles only if you want to.' : 'Add editable text now. Data can be connected later.' }}
         </p>
         <UButton
-          class="mt-3"
+          class="mt-3 min-h-11 lg:min-h-0"
           :icon="hasData ? 'i-lucide-wand-sparkles' : 'i-lucide-type'"
-          :label="hasData ? 'Generate layout' : 'Add text'"
+          :label="hasData ? 'Choose layout' : 'Add text'"
           color="neutral"
           variant="outline"
           size="xs"

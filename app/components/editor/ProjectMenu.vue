@@ -29,21 +29,28 @@ const nameMode = ref<'new' | 'rename'>('new')
 const nameDraft = ref('')
 const selectedStarterId = ref<WidgetStarterId>('blank')
 
+function projectMenuLabel(projectId: string, projectName: string) {
+  const matches = state.value.projects.filter(project => project.name === projectName)
+  const duplicateIndex = matches.findIndex(project => project.id === projectId)
+  const uniqueName = matches.length > 1 ? `${projectName} · ${duplicateIndex + 1}` : projectName
+  return projectId === currentProject.value.id ? `${uniqueName} (current)` : uniqueName
+}
+
 const items = computed<DropdownMenuItem[][]>(() => [
   state.value.projects.map(project => ({
-    label: project.name,
+    label: projectMenuLabel(project.id, project.name),
     icon: project.id === currentProject.value.id ? 'i-lucide-check' : 'i-lucide-file',
     onSelect: () => activateProject(project.id)
   })),
   [
-    { label: 'New project', icon: 'i-lucide-file-plus-2', onSelect: openNew },
-    { label: 'Duplicate project', icon: 'i-lucide-copy-plus', onSelect: () => duplicateProject() },
-    { label: 'Rename project', icon: 'i-lucide-pencil', onSelect: openRename },
-    { label: 'Export project', icon: 'i-lucide-download', onSelect: downloadCurrent },
-    { label: 'Import project', icon: 'i-lucide-upload', onSelect: () => importInput.value?.click() }
+    { label: 'New widget', icon: 'i-lucide-file-plus-2', onSelect: openNew },
+    { label: 'Duplicate widget', icon: 'i-lucide-copy-plus', onSelect: () => duplicateProject() },
+    { label: 'Rename widget', icon: 'i-lucide-pencil', onSelect: openRename },
+    { label: 'Download project backup', icon: 'i-lucide-download', onSelect: downloadCurrent },
+    { label: 'Import project backup', icon: 'i-lucide-upload', onSelect: () => importInput.value?.click() }
   ],
   [
-    { label: 'Delete project', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { deleteModalOpen.value = true } }
+    { label: 'Delete widget', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { deleteModalOpen.value = true } }
   ]
 ])
 
@@ -74,9 +81,10 @@ function selectStarter(id: WidgetStarterId) {
 }
 
 function confirmDelete() {
-  deleteProject(currentProject.value.id)
+  const projectId = currentProject.value.id
   deleteModalOpen.value = false
-  toast.add({ title: 'Project deleted', color: 'success', icon: 'i-lucide-check' })
+  deleteProject(projectId)
+  toast.add({ title: 'Widget deleted', color: 'success', icon: 'i-lucide-check' })
 }
 
 function downloadCurrent() {
@@ -89,7 +97,7 @@ function downloadCurrent() {
   anchor.download = `${currentProject.value.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'widget'}.scriptable-project.json`
   anchor.click()
   URL.revokeObjectURL(url)
-  toast.add({ title: 'Project exported', description: anchor.download, color: 'success', icon: 'i-lucide-download' })
+  toast.add({ title: 'Project backup downloaded', description: anchor.download, color: 'success', icon: 'i-lucide-download' })
 }
 
 async function readImport(event: Event) {
@@ -98,7 +106,7 @@ async function readImport(event: Event) {
   if (!file) return
   try {
     const project = importProject(await file.text())
-    toast.add({ title: 'Project imported', description: project.name, color: 'success', icon: 'i-lucide-upload' })
+    toast.add({ title: 'Project backup imported', description: project.name, color: 'success', icon: 'i-lucide-upload' })
   } catch (error) {
     toast.add({
       title: 'Import failed',
@@ -134,6 +142,7 @@ async function readImport(event: Event) {
         variant="soft"
         :size="compact ? 'sm' : 'md'"
         :square="compact"
+        :class="compact ? 'size-11 justify-center p-0' : ''"
         aria-label="New widget"
         @click="openNew"
       />
@@ -141,8 +150,8 @@ async function readImport(event: Event) {
 
     <UModal
       v-model:open="nameModalOpen"
-      :title="nameMode === 'new' ? 'New widget project' : 'Rename widget project'"
-      :description="nameMode === 'new' ? 'Start visually or choose a working data example.' : 'Update the name shown in the project switcher.'"
+      :title="nameMode === 'new' ? 'New widget' : 'Rename widget'"
+      :description="nameMode === 'new' ? 'Start visually or choose a working data example.' : 'Update the name shown in the widget switcher.'"
       :ui="nameMode === 'new' ? { content: 'max-w-xl' } : undefined"
     >
       <template #body>
@@ -174,24 +183,24 @@ async function readImport(event: Event) {
           </button>
         </div>
 
-        <UFormField label="Project name" :class="nameMode === 'new' ? 'mt-5' : ''">
+        <UFormField label="Widget name" :class="nameMode === 'new' ? 'mt-5' : ''">
           <UInput v-model="nameDraft" :autofocus="nameMode === 'rename'" class="w-full" @keydown.enter="saveName" />
         </UFormField>
       </template>
       <template #footer="{ close }">
         <UButton label="Cancel" color="neutral" variant="outline" @click="close" />
-        <UButton :label="nameMode === 'new' ? 'Create project' : 'Save name'" :disabled="!nameDraft.trim()" @click="saveName" />
+        <UButton :label="nameMode === 'new' ? 'Create widget' : 'Save name'" :disabled="!nameDraft.trim()" @click="saveName" />
       </template>
     </UModal>
 
     <UModal
       v-model:open="deleteModalOpen"
-      title="Delete project"
+      title="Delete widget"
       :description="`Delete “${currentProject.name}” and its locally saved editor state?`"
     >
       <template #footer="{ close }">
         <UButton label="Cancel" color="neutral" variant="outline" @click="close" />
-        <UButton label="Delete project" color="error" variant="solid" @click="confirmDelete" />
+        <UButton label="Delete widget" color="error" variant="solid" @click="confirmDelete" />
       </template>
     </UModal>
   </div>

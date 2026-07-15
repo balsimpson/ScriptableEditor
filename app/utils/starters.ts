@@ -4,6 +4,8 @@ import { applyAdaptiveTemplateSet } from '~/utils/templates'
 
 export type WidgetStarterId = 'bitcoin' | 'expenses' | 'countdown' | 'blank'
 
+export const GTA_COUNTDOWN_IMAGE_URL = 'https://www.pcgamesn.com/wp-content/sites/pcgamesn/2025/05/gta-6-release-date-550x309.jpg'
+
 export interface WidgetStarter {
   id: WidgetStarterId
   name: string
@@ -136,11 +138,16 @@ function countdownDocument() {
     fileName: 'gta-vi-countdown.json',
     sampleData: {
       eventTitle: 'Grand Theft Auto VI',
-      targetDate: '2026-11-19T00:00:00'
+      targetDate: '2026-11-19T00:00:00',
+      backgroundImageUrl: GTA_COUNTDOWN_IMAGE_URL
     },
-    selectedPaths: ['daysToGo', 'eventTitle'],
+    selectedPaths: ['daysToGo', 'hoursRemaining', 'minutesRemaining', 'eventTitle', 'backgroundImageUrl'],
     source: { kind: 'snapshot' },
-    transforms: [transform('days-until', 'daysToGo', 'targetDate')],
+    transforms: [
+      transform('days-until', 'daysToGo', 'targetDate'),
+      transform('hours-until', 'hoursRemaining', 'targetDate'),
+      transform('minutes-until', 'minutesRemaining', 'targetDate')
+    ],
     sampledAt: '2026-07-15T00:00:00.000+05:30'
   }
   setSharedBehavior(document, 15, 'https://www.rockstargames.com/VI/')

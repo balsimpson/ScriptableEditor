@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ScriptableExportIssue } from '~/utils/scriptable'
 import { getBindingIssues } from '~/utils/bindings'
 import { ELEMENT_LABELS } from '~/utils/editor'
 
@@ -15,8 +16,6 @@ const mobileWorkspaceOpen = ref(false)
 const inspectorOpen = ref(false)
 const colorMode = useColorMode()
 const bindingIssues = computed(() => getBindingIssues(document.value))
-const hasData = computed(() => document.value.data.sampleData !== undefined)
-const hasLayout = computed(() => Object.values(document.value.layouts).some(layout => layout.children.length > 0))
 const isDark = computed(() => colorMode.value === 'dark')
 const selectedElementLabel = computed(() => selectedElement.value.type === 'widget'
   ? `${document.value.activeSize} layout`
@@ -63,6 +62,14 @@ function openFirstIssue() {
   selectElement(issue.elementId)
   if (import.meta.client && !window.matchMedia('(min-width: 1024px)').matches) openInspector()
 }
+
+function openExportIssue(issue: ScriptableExportIssue) {
+  if (!issue.size || !issue.elementId) return
+  exportOpen.value = false
+  setActiveSize(issue.size)
+  selectElement(issue.elementId)
+  if (import.meta.client && !window.matchMedia('(min-width: 1024px)').matches) openInspector()
+}
 </script>
 
 <template>
@@ -80,26 +87,6 @@ function openFirstIssue() {
 
       <div class="flex min-w-0 flex-1 items-center justify-center gap-2 px-3">
         <EditorProjectMenu />
-        <span class="hidden h-5 w-px bg-default xl:block" />
-        <nav class="hidden items-center gap-0.5 xl:flex" aria-label="Widget workflow">
-          <UButton
-            :icon="hasLayout ? 'i-lucide-check' : 'i-lucide-shapes'"
-            label="Design"
-            color="neutral"
-            :variant="activeLeftTab === 'structure' ? 'soft' : 'ghost'"
-            size="xs"
-            @click="openEditor"
-          />
-          <UIcon name="i-lucide-chevron-right" class="size-3 text-dimmed" />
-          <UButton
-            :icon="hasData ? 'i-lucide-check' : 'i-lucide-database'"
-            label="Data"
-            color="neutral"
-            :variant="activeLeftTab === 'json' ? 'soft' : 'ghost'"
-            size="xs"
-            @click="openData"
-          />
-        </nav>
       </div>
 
       <div class="flex w-[clamp(18.75rem,28vw,22.25rem)] shrink-0 items-center justify-end gap-2">
@@ -126,8 +113,7 @@ function openFirstIssue() {
           <span class="size-1.5 rounded-full bg-success shadow-[0_0_8px_color-mix(in_srgb,var(--color-teal-400)_65%,transparent)]" />
           <span class="studio-panel-label">Saved</span>
         </div>
-        <UIcon name="i-lucide-chevron-right" class="hidden size-3 text-dimmed xl:block" />
-        <UButton icon="i-lucide-share" label="Export widget" size="sm" @click="openExport" />
+        <UButton icon="i-lucide-share" label="Export widget" size="md" @click="openExport" />
       </div>
     </header>
 
@@ -143,6 +129,7 @@ function openFirstIssue() {
         variant="soft"
         size="sm"
         square
+        class="size-11 justify-center p-0"
         :aria-label="`${bindingIssues.length} ${bindingIssues.length === 1 ? 'binding issue' : 'binding issues'}`"
         @click="openFirstIssue"
       />
@@ -152,14 +139,31 @@ function openFirstIssue() {
         variant="ghost"
         size="sm"
         square
+        class="size-11 justify-center p-0"
         :aria-label="isDark ? 'Switch to light appearance' : 'Switch to dark appearance'"
         @click="toggleColorMode"
       />
     </header>
 
     <main class="min-h-0 flex-1 overflow-hidden">
-      <div class="flex h-full min-w-0">
-        <aside class="hidden w-[clamp(15rem,23vw,18.5rem)] shrink-0 flex-col border-r border-default bg-[var(--studio-panel)] lg:flex">
+      <UDashboardGroup
+        storage="cookie"
+        storage-key="scriptable-widget-studio"
+        unit="px"
+        :ui="{ base: 'relative flex h-full min-w-0 overflow-hidden' }"
+      >
+        <UDashboardSidebar
+          id="workspace"
+          resizable
+          :toggle="false"
+          :min-size="240"
+          :default-size="296"
+          :max-size="560"
+          :ui="{
+            root: 'min-h-0 bg-[var(--studio-panel)]',
+            body: 'min-h-0 gap-0 overflow-hidden p-0'
+          }"
+        >
           <div class="grid h-12 shrink-0 grid-cols-2 gap-1 border-b border-muted p-1.5">
             <UButton
               icon="i-lucide-layers-3"
@@ -181,14 +185,14 @@ function openFirstIssue() {
 
           <EditorStructurePanel v-if="activeLeftTab === 'structure'" />
           <EditorJsonExplorerPanel v-else />
-        </aside>
+        </UDashboardSidebar>
 
         <EditorWidgetPreview />
 
         <aside class="hidden w-[clamp(18.75rem,28vw,22.25rem)] shrink-0 flex-col border-l border-default bg-[var(--studio-panel)] lg:flex">
           <EditorInspectorPanel />
         </aside>
-      </div>
+      </UDashboardGroup>
     </main>
 
     <nav class="studio-mobile-dock grid shrink-0 grid-cols-4 gap-1 border-t border-default bg-[var(--studio-panel)] px-2 pt-2 lg:hidden" aria-label="Widget tools">
@@ -231,7 +235,7 @@ function openFirstIssue() {
     <UDrawer
       v-model:open="mobileWorkspaceOpen"
       :title="activeLeftTab === 'structure' ? 'Layers' : 'Data'"
-      description="Edit the widget without leaving the preview workspace."
+      :description="activeLeftTab === 'structure' ? 'Add, reorder, or rename the layers in this layout.' : 'Choose where this widget gets its values and connect the fields it uses.'"
       handle-only
       :ui="{
         content: 'h-[78dvh]',
@@ -281,6 +285,6 @@ function openFirstIssue() {
       </template>
     </USlideover>
 
-    <EditorGeneratedCode v-model:open="exportOpen" @select-issue="openFirstIssue" />
+    <EditorGeneratedCode v-model:open="exportOpen" @select-issue="openExportIssue" />
   </div>
 </template>

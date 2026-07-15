@@ -28,7 +28,7 @@ const sourceKind = computed<WidgetDataSource['kind']>({
 })
 
 const sourceItems: { label: string, shortLabel: string, value: WidgetDataSource['kind'], icon: string }[] = [
-  { label: 'Web API', shortLabel: 'API', value: 'http-json', icon: 'i-lucide-globe-2' },
+  { label: 'Web API', shortLabel: 'Web API', value: 'http-json', icon: 'i-lucide-globe-2' },
   { label: 'Apple Shortcuts', shortLabel: 'Shortcut', value: 'shortcut', icon: 'i-lucide-workflow' },
   { label: 'Built-in values', shortLabel: 'Built-in', value: 'snapshot', icon: 'i-lucide-braces' }
 ]
@@ -203,9 +203,9 @@ function selectSource(kind: WidgetDataSource['kind']) {
     <div class="flex h-11 items-center justify-between border-b border-muted px-3">
       <div class="flex items-center gap-2">
         <span class="size-1.5 rounded-full" :class="hasData ? 'bg-success' : 'bg-dimmed'" />
-        <p class="studio-panel-label text-muted">Widget values</p>
+        <p class="studio-panel-label text-muted">Widget data</p>
       </div>
-      <UButton icon="i-lucide-route" label="Data Probe" color="neutral" variant="ghost" size="xs" @click="openSetup" />
+      <UButton icon="i-lucide-route" label="Capture sample" color="neutral" variant="ghost" size="xs" @click="openSetup" />
     </div>
 
     <div class="studio-scrollbar min-h-0 flex-1 overflow-y-auto">
@@ -259,7 +259,7 @@ function selectSource(kind: WidgetDataSource['kind']) {
       <section class="space-y-3 border-b border-muted p-3">
         <div class="flex items-center justify-between gap-2">
           <div>
-            <p class="studio-panel-label text-muted">Sample</p>
+            <p class="studio-panel-label text-muted">Sample data</p>
             <p v-if="document.data.sampledAt" class="mt-1 text-[10px] text-toned">Captured {{ new Date(document.data.sampledAt).toLocaleString() }}</p>
           </div>
           <div class="flex items-center gap-1">
@@ -280,14 +280,14 @@ function selectSource(kind: WidgetDataSource['kind']) {
           @update:model-value="updateJson(String($event))"
         />
         <p v-if="parseError" class="text-xs leading-5 text-error">{{ parseError }}</p>
-        <p v-else class="text-xs leading-5 text-muted">Paste Data Probe output or raw JSON. Valid data updates the preview immediately.</p>
+        <p v-else class="text-xs leading-5 text-muted">Paste captured data or raw JSON. Valid data updates the preview immediately.</p>
       </section>
 
       <section v-if="hasData" class="space-y-3 border-b border-muted p-3">
         <div class="flex items-center justify-between gap-2">
           <div>
-            <p class="studio-panel-label text-muted">Computed fields</p>
-            <p class="mt-1 text-xs leading-5 text-muted">Create stable widget values from nested data and arrays.</p>
+            <p class="studio-panel-label text-muted">Calculated values</p>
+            <p class="mt-1 text-xs leading-5 text-muted">Turn nested data and lists into values that are easier to use in the widget.</p>
           </div>
           <UButton icon="i-lucide-plus" label="Add" color="neutral" variant="outline" size="xs" @click="addTransform" />
         </div>
@@ -296,7 +296,7 @@ function selectSource(kind: WidgetDataSource['kind']) {
           <div v-for="(transform, index) in document.data.transforms" :key="transform.id" class="space-y-3 py-3">
             <div class="flex items-center justify-between gap-2">
               <span class="font-mono text-[10px] text-dimmed">{{ String(index + 1).padStart(2, '0') }}</span>
-              <UButton icon="i-lucide-trash-2" aria-label="Remove computed field" color="neutral" variant="ghost" size="xs" @click="removeTransform(transform.id)" />
+              <UButton icon="i-lucide-trash-2" aria-label="Remove calculated value" color="neutral" variant="ghost" size="xs" @click="removeTransform(transform.id)" />
             </div>
             <UFormField label="Operation">
               <USelect
@@ -312,7 +312,7 @@ function selectSource(kind: WidgetDataSource['kind']) {
             <UFormField v-if="['sum', 'first', 'last'].includes(transform.operation)" :label="transform.operation === 'sum' ? 'Number inside each item' : 'Value from the chosen item'">
               <USelect v-model="transform.valuePath" :items="itemValueItems(transform)" class="w-full font-mono" />
             </UFormField>
-            <UFormField label="Widget field name" :error="transformError(transform) || undefined">
+            <UFormField label="New field name" :error="transformError(transform) || undefined">
               <UInput v-model="transform.outputKey" class="w-full font-mono" @update:model-value="refreshDataBindings" />
             </UFormField>
           </div>
@@ -327,7 +327,7 @@ function selectSource(kind: WidgetDataSource['kind']) {
             <UBadge v-if="usedFieldCount" color="primary" variant="subtle" :label="`${usedFieldCount} used`" size="sm" />
           </div>
         </div>
-        <p class="text-xs leading-5 text-muted">Enable fields for new bindings. Fields already used by a layout stay enabled.</p>
+        <p class="text-xs leading-5 text-muted">Choose which fields can be added to the layout. Fields already in use stay enabled.</p>
         <div class="rounded-md border border-muted bg-default p-1">
           <EditorJsonTreeNode label="widgetData" :value="previewData" path="" />
         </div>
@@ -336,16 +336,16 @@ function selectSource(kind: WidgetDataSource['kind']) {
       <div v-if="!hasData" class="px-5 py-10 text-center">
         <UIcon name="i-lucide-plug-zap" class="mx-auto mb-3 size-6 text-dimmed" />
         <p class="text-sm font-medium text-default">Capture the widget’s real data</p>
-        <p class="mx-auto mt-1 max-w-56 text-xs leading-5 text-muted">Run Data Probe on the phone, then paste its copied JSON here.</p>
-        <UButton class="mt-3" icon="i-lucide-route" label="Get Data Probe" color="neutral" variant="outline" size="xs" @click="openSetup" />
+        <p class="mx-auto mt-1 max-w-56 text-xs leading-5 text-muted">Run the temporary Data Probe script on the phone, then paste the data it copies here.</p>
+        <UButton class="mt-3" icon="i-lucide-route" label="Capture sample data" color="neutral" variant="outline" size="xs" @click="openSetup" />
       </div>
     </div>
   </section>
 
   <UModal
     v-model:open="setupOpen"
-    title="Scriptable Data Probe"
-    description="Use one temporary script to capture a real response before building the widget."
+    title="Capture sample data"
+    description="Use the temporary Data Probe script to bring a real response into this editor."
   >
     <template #body>
       <ol class="space-y-4 text-sm text-muted">

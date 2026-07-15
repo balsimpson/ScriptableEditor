@@ -160,7 +160,10 @@ function parseJSON(value, message) {
 }
 
 async function readSource() {
-  if (args.shortcutParameter !== null && args.shortcutParameter !== undefined) {
+  if (config.runsWithSiri) {
+    if (args.shortcutParameter === null || args.shortcutParameter === undefined || args.shortcutParameter === "") {
+      throw new Error("No Shortcut input was provided. Connect a Dictionary, List, or JSON text value to Run Script.")
+    }
     return {
       source: { kind: "shortcut", updateMode: "overwrite", appendKey: "" },
       sample: parseJSON(args.shortcutParameter, "Shortcut input must contain valid JSON.")
@@ -183,11 +186,14 @@ async function readSource() {
     urlAlert.addAction("Fetch JSON")
     urlAlert.addCancelAction("Cancel")
     const urlChoice = await urlAlert.presentAlert()
-    if (urlChoice === -1) throw new Error("Sampling cancelled.")
+    if (urlChoice === -1) return null
     const url = urlAlert.textFieldValue(0).trim()
     if (!/^https?:\\/\\//i.test(url)) throw new Error("Enter a complete HTTP or HTTPS URL.")
     const request = new Request(url)
+    request.timeoutInterval = 15
     const sample = await request.loadJSON()
+    const statusCode = request.response && request.response.statusCode
+    if (statusCode && (statusCode < 200 || statusCode >= 300)) throw new Error("The endpoint returned HTTP " + statusCode + ".")
     return { source: { kind: "http-json", url }, sample }
   }
 
@@ -200,12 +206,13 @@ async function readSource() {
     }
   }
 
-  throw new Error("Sampling cancelled.")
+  return null
 }
 
 async function main() {
   try {
     const result = await readSource()
+    if (!result) return
     if (result.sample === null || result.sample === undefined) {
       throw new Error("The data source returned no value.")
     }
@@ -217,16 +224,27 @@ async function main() {
       observedAt: new Date().toISOString()
     }
     const output = JSON.stringify(bundle, null, 2)
-    Pasteboard.copyString(output)
-    await QuickLook.present(output)
+    if (config.runsWithSiri) {
+      Script.setShortcutOutput({ ok: true, bundle, json: output })
+    } else {
+      Pasteboard.copyString(output)
+      await QuickLook.present(output)
+    }
   } catch (error) {
-    const alert = new Alert()
-    alert.title = "Data sampling failed"
-    alert.message = String(error && error.message ? error.message : error)
-    alert.addAction("Done")
-    await alert.presentAlert()
+    const message = String(error && error.message ? error.message : error)
+    console.error("DATA-PROBE-001 " + message)
+    if (config.runsWithSiri) {
+      Script.setShortcutOutput({ ok: false, error: { code: "DATA-PROBE-001", message, fix: "Correct the Shortcut input or endpoint, then run Data Probe again." } })
+    } else {
+      const alert = new Alert()
+      alert.title = "Data sampling failed"
+      alert.message = message + "\\n\\nFix the named input or endpoint and run Data Probe again."
+      alert.addAction("Done")
+      await alert.presentAlert()
+    }
+  } finally {
+    Script.complete()
   }
-  Script.complete()
 }
 
 await main()
