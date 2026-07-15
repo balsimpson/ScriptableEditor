@@ -3,12 +3,25 @@ import type { ScriptableExportIssue } from '~/utils/scriptable'
 import { getBindingIssues } from '~/utils/bindings'
 import { ELEMENT_LABELS } from '~/utils/editor'
 
+useSeoMeta({
+  title: 'Scriptable Widget Studio',
+  description: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.',
+  ogTitle: 'Scriptable Widget Studio',
+  ogDescription: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.',
+  ogType: 'website',
+  twitterCard: 'summary_large_image',
+  twitterTitle: 'Scriptable Widget Studio',
+  twitterDescription: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
+})
+
 const {
   document,
   activeLeftTab,
   selectedElement,
+  templatePickerOpen,
   setActiveSize,
-  selectElement
+  selectElement,
+  openTemplatePicker
 } = useWidgetEditor()
 
 const exportOpen = ref(false)
@@ -215,13 +228,13 @@ function openExportIssue(issue: ScriptableExportIssue) {
         @click="openMobileWorkspace('json')"
       />
       <UButton
-        icon="i-lucide-sliders-horizontal"
-        label="Inspect"
-        color="neutral"
-        variant="ghost"
+        icon="i-lucide-wand-sparkles"
+        label="Design"
+        color="primary"
+        variant="soft"
         class="min-h-11 flex-col gap-0.5"
         :ui="{ label: 'text-[10px]' }"
-        @click="openInspector"
+        @click="openTemplatePicker"
       />
       <UButton
         icon="i-lucide-share"
@@ -286,5 +299,6 @@ function openExportIssue(issue: ScriptableExportIssue) {
     </USlideover>
 
     <EditorGeneratedCode v-model:open="exportOpen" @select-issue="openExportIssue" />
+    <EditorTemplatePicker v-model:open="templatePickerOpen" />
   </div>
 </template>

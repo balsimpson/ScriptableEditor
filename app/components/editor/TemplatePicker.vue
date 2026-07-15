@@ -273,19 +273,33 @@ function openJson() {
           </div>
 
           <div class="flex min-h-0 flex-col border-t border-muted bg-elevated/40 p-3 lg:border-l lg:border-t-0">
-            <div class="flex shrink-0 items-center justify-between gap-3 px-2 pb-2 pt-1">
-              <div>
-                <p class="text-sm font-semibold text-highlighted">{{ previews.length }} design options</p>
-                <p class="mt-0.5 text-xs text-muted">Each roll creates four new directions.</p>
+            <div class="shrink-0 rounded-md border border-primary/25 bg-primary/5 px-3 py-3">
+              <div class="flex items-start gap-2.5">
+                <span class="grid size-8 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+                  <UIcon name="i-lucide-dices" class="size-4" />
+                </span>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-highlighted">Explore another direction</p>
+                  <p class="mt-0.5 text-xs leading-5 text-muted">Roll a fresh set without changing your widget.</p>
+                </div>
               </div>
               <UButton
+                class="mt-3"
                 icon="i-lucide-dices"
                 :label="`Roll ${previews.length} new designs`"
-                color="neutral"
-                variant="outline"
-                size="xs"
+                color="primary"
+                variant="soft"
+                size="sm"
+                block
                 @click="rollDesigns"
               />
+            </div>
+
+            <div class="flex shrink-0 items-center justify-between gap-3 px-2 pb-2 pt-4">
+              <div>
+                <p class="text-sm font-semibold text-highlighted">{{ previews.length }} design options</p>
+                <p class="mt-0.5 text-xs text-muted">Select one to preview it at full size.</p>
+              </div>
             </div>
 
             <div class="studio-scrollbar mt-1 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1 [scrollbar-gutter:stable]" role="listbox" :aria-label="`${targetSize} layout styles`">

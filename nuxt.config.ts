@@ -15,11 +15,69 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
+      htmlAttrs: {
+        lang: 'en'
+      },
       title: 'Scriptable Widget Studio',
+      titleTemplate: '%s · Scriptable Widget Studio',
       meta: [
         {
           name: 'description',
-          content: 'Build Scriptable widgets visually and export readable JavaScript.'
+          content: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
+        },
+        {
+          name: 'robots',
+          content: 'index, follow'
+        },
+        {
+          name: 'application-name',
+          content: 'Scriptable Widget Studio'
+        },
+        {
+          name: 'apple-mobile-web-app-title',
+          content: 'Scriptable Widget Studio'
+        },
+        {
+          name: 'format-detection',
+          content: 'telephone=no'
+        },
+        {
+          name: 'theme-color',
+          content: '#0f172a',
+          media: '(prefers-color-scheme: dark)'
+        },
+        {
+          name: 'theme-color',
+          content: '#f8fafc',
+          media: '(prefers-color-scheme: light)'
+        },
+        {
+          property: 'og:type',
+          content: 'website'
+        },
+        {
+          property: 'og:site_name',
+          content: 'Scriptable Widget Studio'
+        },
+        {
+          property: 'og:title',
+          content: 'Scriptable Widget Studio'
+        },
+        {
+          property: 'og:description',
+          content: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
+        },
+        {
+          name: 'twitter:card',
+          content: 'summary_large_image'
+        },
+        {
+          name: 'twitter:title',
+          content: 'Scriptable Widget Studio'
+        },
+        {
+          name: 'twitter:description',
+          content: 'Build Scriptable widgets visually, inspect live data, and export readable JavaScript.'
         }
       ]
     }

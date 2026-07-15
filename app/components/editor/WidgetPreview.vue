@@ -10,6 +10,7 @@ const {
   selectedElementId,
   canvasDraggingId,
   activeLeftTab,
+  openTemplatePicker,
   setActiveSize,
   setSizeEnabled,
   copyLayout,
@@ -119,6 +120,16 @@ function useStarter(id: WidgetStarterId) {
       </div>
 
       <div class="ml-auto flex max-w-full min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
+        <UButton
+          icon="i-lucide-wand-sparkles"
+          label="Choose design"
+          color="primary"
+          variant="soft"
+          size="sm"
+          class="min-h-11 px-3 sm:min-h-0"
+          @click="openTemplatePicker"
+        />
+
         <div class="hidden max-w-full flex-wrap items-center justify-end rounded-md bg-muted p-0.5 sm:flex">
           <UButton
             icon="i-lucide-layout-grid"

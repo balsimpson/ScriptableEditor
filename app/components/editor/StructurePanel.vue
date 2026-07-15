@@ -66,6 +66,5 @@ function continueEmptyLayout() {
       </div>
     </div>
 
-    <EditorTemplatePicker v-model:open="templatePickerOpen" />
   </section>
 </template>

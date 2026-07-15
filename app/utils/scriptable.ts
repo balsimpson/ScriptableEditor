@@ -111,10 +111,6 @@ function buildElementLines(document: EditorDocument, root: WidgetElement, indent
               build(child, variable, instanceIndex, element.type, childLocation)
               return
             }
-            if (child.type === 'text') {
-              build(child, variable, instanceIndex, element.type, childLocation)
-              return
-            }
             const alignmentRow = `${identifier(element.name, 'alignment')}Alignment${++counter}`
             lines.push(`${indent}const ${alignmentRow} = ${variable}.addStack()`)
             lines.push(`${indent}${alignmentRow}.layoutHorizontally()`)

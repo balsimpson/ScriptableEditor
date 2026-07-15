@@ -211,8 +211,10 @@ test('GTA VI countdown uses editable flexible spacing between timer units', () =
   }
 
   assert.equal((code.match(/countdownTimer\d+\.addSpacer\(null\)/g) || []).length, 6)
-  assert.doesNotMatch(code, /hoursTimerUnitAlignment/)
-  assert.doesNotMatch(code, /minTimerUnitAlignment/)
+  assert.doesNotMatch(code, /countdownTimer\d+\.addSpacer\(\)/)
+  assert.equal((code.match(/daysTimerUnitAlignment\d+\.addSpacer\(\)/g) || []).length, 12)
+  assert.equal((code.match(/hoursTimerUnitAlignment\d+\.addSpacer\(\)/g) || []).length, 12)
+  assert.equal((code.match(/minTimerUnitAlignment\d+\.addSpacer\(\)/g) || []).length, 12)
 })
 
 test('generated images and stack alignment preserve editor settings', () => {
